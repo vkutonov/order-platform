@@ -1,14 +1,19 @@
 server:
-  port: 8081
+  port: ${ORDER_SERVICE_PORT:8081}
 
 spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+
   application:
     name: order-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5433/order_db
-    username: order_user
-    password: order_password
+    url: jdbc:postgresql://${ORDER_DB_HOST:localhost}:${ORDER_DB_PORT:5433}/${ORDER_DB_NAME:order_db}
+    username: ${ORDER_DB_USERNAME:order_user}
+    password: ${ORDER_DB_PASSWORD:order_password}
     driver-class-name: org.postgresql.Driver
 
   jpa:
