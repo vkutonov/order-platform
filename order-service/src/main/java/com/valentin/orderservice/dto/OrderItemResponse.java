@@ -1,4 +1,4 @@
-package com.valentin.orderservice.order.domain.dto;
+package com.valentin.orderservice.dto;
 
 import java.math.BigDecimal;
 import java.util.UUID;

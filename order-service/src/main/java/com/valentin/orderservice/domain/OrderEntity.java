@@ -1,10 +1,11 @@
-package com.valentin.orderservice.order.domain;
+package com.valentin.orderservice.domain;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.math.BigDecimal;
@@ -22,13 +23,14 @@ import java.util.UUID;
 public class OrderEntity {
     @Id
     @UuidGenerator
+    @GeneratedValue
     @Column(nullable = false, updatable = false)
     private UUID id;
 
     @Column(name = "user_id")
     private UUID userId;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.PERSIST, orphanRemoval = true)
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItemEntity> orderItems = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
@@ -50,4 +52,19 @@ public class OrderEntity {
     @Column(name = "version")
     @Version
     private Long version;
+
+    public BigDecimal recalculateTotalPrice() {
+        BigDecimal totalPrice = BigDecimal.ZERO;
+
+        for (OrderItemEntity item : orderItems) {
+            totalPrice = totalPrice.add(item.getTotalPrice());
+        }
+
+        return totalPrice;
+    }
+
+    public void addItem(OrderItemEntity item) {
+        orderItems.add(item);
+        item.setOrder(this);
+    }
 }

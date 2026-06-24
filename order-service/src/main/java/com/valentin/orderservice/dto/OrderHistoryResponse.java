@@ -1,7 +1,6 @@
-package com.valentin.orderservice.order.domain.dto;
+package com.valentin.orderservice.dto;
 
-import com.valentin.orderservice.order.domain.OrderEntity;
-import com.valentin.orderservice.order.domain.OrderStatus;
+import com.valentin.orderservice.domain.OrderStatus;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotNull;
 
@@ -12,12 +11,11 @@ public record OrderHistoryResponse(
         @NotNull
         UUID id,
         @NotNull
-        OrderEntity order,
+        UUID orderId,
         OrderStatus oldStatus,
         @NotNull
         OrderStatus newStatus,
         String reason,
-        @FutureOrPresent
         Instant createdAt
 ) {
 }

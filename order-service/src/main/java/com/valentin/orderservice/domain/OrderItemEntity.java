@@ -1,8 +1,7 @@
-package com.valentin.orderservice.order.domain;
+package com.valentin.orderservice.domain;
 
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -20,6 +19,7 @@ public class OrderItemEntity {
 
     @Id
     @UuidGenerator
+    @GeneratedValue
     @Column(nullable = false, updatable = false)
     private UUID id;
 
@@ -41,4 +41,21 @@ public class OrderItemEntity {
 
     @Column(name = "total_price", precision = 19, scale = 2)
     private BigDecimal totalPrice;
+
+
+    public static OrderItemEntity create(
+            UUID productId,
+            String productName,
+            BigDecimal unitPrice,
+            Integer quantity
+    ) {
+        OrderItemEntity orderItem = new OrderItemEntity();
+        orderItem.setProductId(productId);
+        orderItem.setProductName(productName);
+        orderItem.setUnitPrice(unitPrice);
+        orderItem.setQuantity(quantity);
+        orderItem.setTotalPrice(unitPrice.multiply(BigDecimal.valueOf(quantity)));
+
+        return orderItem;
+    }
 }

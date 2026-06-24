@@ -1,6 +1,6 @@
-package com.valentin.orderservice.order.domain.db;
+package com.valentin.orderservice.db;
 
-import com.valentin.orderservice.order.domain.OrderStatusHistoryEntity;
+import com.valentin.orderservice.domain.OrderStatusHistoryEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

@@ -1,6 +1,6 @@
-package com.valentin.orderservice.order.domain.dto;
+package com.valentin.orderservice.dto;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
@@ -11,6 +11,7 @@ public record CreateOrderRequest (
         @NotNull
         UUID userId,
         @NotEmpty
+        @Valid
         List<CreateOrderItemRequest> items
 ) {
 }

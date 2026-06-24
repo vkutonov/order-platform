@@ -1,6 +1,7 @@
-package com.valentin.orderservice.order.domain.dto;
+package com.valentin.orderservice.dto;
 
 import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
@@ -15,6 +16,7 @@ public record CreateOrderItemRequest(
         @PositiveOrZero
         BigDecimal unitPrice,
         @Positive
+        @NotNull
         Integer quantity
 ) {
 }

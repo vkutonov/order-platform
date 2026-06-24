@@ -1,6 +1,6 @@
-package com.valentin.orderservice.order.domain.dto;
+package com.valentin.orderservice.dto;
 
-import com.valentin.orderservice.order.domain.OrderStatus;
+import com.valentin.orderservice.domain.OrderStatus;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -13,7 +13,7 @@ public record OrderResponse(
         OrderStatus status,
         BigDecimal totalPrice,
         String currency,
-        List<OrderItemResponse> items,
+        List<OrderItemResponse> orderItems,
         Instant createdAt,
         Instant updatedAt
 ) {

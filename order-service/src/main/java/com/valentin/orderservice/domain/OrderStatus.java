@@ -1,4 +1,4 @@
-package com.valentin.orderservice.order.domain;
+package com.valentin.orderservice.domain;
 
 public enum OrderStatus {
     WAITING_FOR_INVENTORY,

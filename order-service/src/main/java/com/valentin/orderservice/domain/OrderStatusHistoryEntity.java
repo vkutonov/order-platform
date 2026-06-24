@@ -1,12 +1,10 @@
-package com.valentin.orderservice.order.domain;
+package com.valentin.orderservice.domain;
 
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.aspectj.weaver.ast.Or;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.Instant;
@@ -21,6 +19,7 @@ import java.util.UUID;
 public class OrderStatusHistoryEntity {
     @Id
     @UuidGenerator
+    @GeneratedValue
     @Column(nullable = false, updatable = false)
     private UUID id;
 
@@ -36,9 +35,25 @@ public class OrderStatusHistoryEntity {
     @Column(name = "new_status")
     private OrderStatus newStatus;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "reason")
-    private String reason;
+    private OrderChangeHistoryReason reason;
 
     @Column(name = "created_at")
     private Instant createdAt;
+
+    public static OrderStatusHistoryEntity create(
+            OrderEntity order,
+            OrderStatus status,
+            OrderChangeHistoryReason reason,
+            Instant time
+    ) {
+        OrderStatusHistoryEntity orderStatusHistoryEntity = new OrderStatusHistoryEntity();
+        orderStatusHistoryEntity.setCreatedAt(time);
+        orderStatusHistoryEntity.setOrder(order);
+        orderStatusHistoryEntity.setNewStatus(status);
+        orderStatusHistoryEntity.setReason(reason);
+
+        return orderStatusHistoryEntity;
+    }
 }
