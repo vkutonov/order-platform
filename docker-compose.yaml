@@ -1,6 +1,6 @@
 services:
   order-postgres:
-    image: postgres:16-alpine
+    image: postgres:18.4-bookworm
     container_name: order-postgres
     environment:
       POSTGRES_DB: ${ORDER_DB_NAME}
@@ -9,7 +9,7 @@ services:
     ports:
       - "${ORDER_DB_PORT}:5432"
     volumes:
-      - order-postgres-data:/var/lib/postgresql/data
+      - order-postgres-data:/var/lib/postgresql
 
 volumes:
   order-postgres-data:
