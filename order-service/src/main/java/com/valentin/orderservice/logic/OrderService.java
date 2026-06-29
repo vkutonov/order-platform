@@ -71,7 +71,7 @@ public class OrderService {
         );
     }
 
-
+    @Transactional(readOnly = true)
     public List<OrderHistoryResponse> getOrderHistoryById(UUID orderId) {
 
         if (!orderRepository.existsById(orderId)) {
