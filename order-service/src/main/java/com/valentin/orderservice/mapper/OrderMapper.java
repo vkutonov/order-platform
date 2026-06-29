@@ -2,18 +2,23 @@ package com.valentin.orderservice.mapper;
 
 
 import com.valentin.orderservice.domain.OrderEntity;
+import com.valentin.orderservice.domain.OrderHistoryEntity;
 import com.valentin.orderservice.domain.OrderItemEntity;
-import com.valentin.orderservice.dto.CreateOrderItemRequest;
-import com.valentin.orderservice.dto.CreateOrderRequest;
-import com.valentin.orderservice.dto.OrderItemResponse;
-import com.valentin.orderservice.dto.OrderResponse;
+import com.valentin.orderservice.dto.*;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+
+import java.util.List;
 
 @Mapper(componentModel = "spring")
 public interface OrderMapper {
 
-    public OrderResponse toOrderResponse(OrderEntity entity);
+    OrderResponse toOrderResponse(OrderEntity entity);
 
-    public OrderItemResponse toOrderItemResponse(OrderItemEntity entity);
+    OrderItemResponse toOrderItemResponse(OrderItemEntity entity);
+
+    @Mapping(target = "orderId", source = "order.id")
+    OrderHistoryResponse toOrderHistoryResponse(OrderHistoryEntity entity);
+
+    List<OrderHistoryResponse> toOrderHistoryResponseList(List<OrderHistoryEntity> entities);
 }

@@ -1,10 +1,11 @@
 package com.valentin.orderservice.logic;
 
 import com.valentin.orderservice.db.OrderRepository;
-import com.valentin.orderservice.db.OrderStatusHistoryRepository;
+import com.valentin.orderservice.db.OrderHistoryRepository;
 import com.valentin.orderservice.domain.*;
 import com.valentin.orderservice.dto.CreateOrderItemRequest;
 import com.valentin.orderservice.dto.CreateOrderRequest;
+import com.valentin.orderservice.dto.OrderHistoryResponse;
 import com.valentin.orderservice.dto.OrderResponse;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.mapper.OrderMapper;
@@ -21,7 +22,7 @@ import java.util.UUID;
 public class OrderService {
     private final OrderMapper mapper;
     private final OrderRepository orderRepository;
-    private final OrderStatusHistoryRepository orderStatusHistoryRepository;
+    private final OrderHistoryRepository orderHistoryRepository;
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest orderRequest) {
@@ -50,14 +51,14 @@ public class OrderService {
         order.setTotalPrice(order.recalculateTotalPrice());
         orderRepository.save(order);
 
-        OrderStatusHistoryEntity orderStatusHistory = OrderStatusHistoryEntity.create(
+        OrderHistoryEntity orderStatusHistory = OrderHistoryEntity.create(
                 order,
                 OrderStatus.WAITING_FOR_INVENTORY,
                 OrderChangeHistoryReason.ORDER_CREATED,
                 instantNow
         );
 
-        orderStatusHistoryRepository.save(orderStatusHistory);
+        orderHistoryRepository.save(orderStatusHistory);
 
         return mapper.toOrderResponse(order);
     }
@@ -68,5 +69,18 @@ public class OrderService {
         return mapper.toOrderResponse(orderRepository.findById(orderId).orElseThrow( () ->
                 new OrderNotFoundException("Order not found id = " + orderId))
         );
+    }
+
+
+    public List<OrderHistoryResponse> getOrderHistoryById(UUID orderId) {
+
+        if (!orderRepository.existsById(orderId)) {
+            throw new OrderNotFoundException("Order history not found id = " + orderId);
+        }
+
+        List<OrderHistoryEntity> orderHistories = orderHistoryRepository
+                .findOrderHistoryByIdByCreatedTimeAsc(orderId);
+
+        return mapper.toOrderHistoryResponseList(orderHistories);
     }
 }
