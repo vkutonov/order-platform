@@ -11,7 +11,6 @@ public record CreateOrderRequest (
         @NotNull
         UUID userId,
         @NotEmpty
-        @Valid
-        List<CreateOrderItemRequest> items
+        List<@Valid CreateOrderItemRequest> items
 ) {
 }
