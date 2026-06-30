@@ -1,6 +1,7 @@
 package com.valentin.orderservice.api;
 
 import com.valentin.orderservice.dto.CreateOrderRequest;
+import com.valentin.orderservice.dto.OrderHistoryResponse;
 import com.valentin.orderservice.dto.OrderResponse;
 import com.valentin.orderservice.logic.OrderService;
 import jakarta.validation.Valid;
@@ -10,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -36,5 +38,15 @@ public class OrderController {
         OrderResponse response = orderService.createOrder(request);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping("/{id}/history")
+    public ResponseEntity<List<OrderHistoryResponse>> getOrderHistoryById(
+            @PathVariable UUID id
+    ) {
+        log.info("LOG: called getOrderHistoryById");
+
+        List<OrderHistoryResponse> response = orderService.getOrderHistoryById(id);
+        return ResponseEntity.ok(response);
     }
 }

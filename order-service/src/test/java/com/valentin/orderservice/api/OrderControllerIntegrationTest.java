@@ -2,7 +2,7 @@ package com.valentin.orderservice.api;
 
 import com.jayway.jsonpath.JsonPath;
 import com.valentin.orderservice.db.OrderRepository;
-import com.valentin.orderservice.db.OrderStatusHistoryRepository;
+import com.valentin.orderservice.db.OrderHistoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,7 +50,7 @@ class OrderControllerIntegrationTest {
     OrderRepository orderRepository;
 
     @Autowired
-    OrderStatusHistoryRepository orderStatusHistoryRepository;
+    OrderHistoryRepository orderHistoryRepository;
 
     @DynamicPropertySource
     static void configurePostgres(DynamicPropertyRegistry registry) {
@@ -61,7 +61,7 @@ class OrderControllerIntegrationTest {
 
     @BeforeEach
     void cleanDatabase() {
-        orderStatusHistoryRepository.deleteAll();
+        orderHistoryRepository.deleteAll();
         orderRepository.deleteAll();
     }
 
@@ -90,7 +90,7 @@ class OrderControllerIntegrationTest {
                 .andExpect(jsonPath("$.orderItems[1].totalPrice").value(25.0));
 
         assertThat(orderRepository.count()).isEqualTo(1);
-        assertThat(orderStatusHistoryRepository.count()).isEqualTo(1);
+        assertThat(orderHistoryRepository.count()).isEqualTo(1);
     }
 
     @Test

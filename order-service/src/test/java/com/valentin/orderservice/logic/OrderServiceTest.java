@@ -1,15 +1,12 @@
 package com.valentin.orderservice.logic;
 
 import com.valentin.orderservice.db.OrderRepository;
-import com.valentin.orderservice.db.OrderStatusHistoryRepository;
+import com.valentin.orderservice.db.OrderHistoryRepository;
 import com.valentin.orderservice.domain.OrderChangeHistoryReason;
 import com.valentin.orderservice.domain.OrderEntity;
+import com.valentin.orderservice.domain.OrderHistoryEntity;
 import com.valentin.orderservice.domain.OrderStatus;
-import com.valentin.orderservice.domain.OrderStatusHistoryEntity;
-import com.valentin.orderservice.dto.CreateOrderItemRequest;
-import com.valentin.orderservice.dto.CreateOrderRequest;
-import com.valentin.orderservice.dto.OrderItemResponse;
-import com.valentin.orderservice.dto.OrderResponse;
+import com.valentin.orderservice.dto.*;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.mapper.OrderMapper;
 import org.junit.jupiter.api.Test;
@@ -38,7 +35,7 @@ public class OrderServiceTest {
     private OrderRepository orderRepository;
 
     @Mock
-    private OrderStatusHistoryRepository orderStatusHistoryRepository;
+    private OrderHistoryRepository orderHistoryRepository;
 
     @Mock
     private OrderMapper orderMapper;
@@ -50,7 +47,7 @@ public class OrderServiceTest {
     private ArgumentCaptor<OrderEntity> orderCaptor;
 
     @Captor
-    private ArgumentCaptor<OrderStatusHistoryEntity> historyCaptor;
+    private ArgumentCaptor<OrderHistoryEntity> historyCaptor;
 
     @Test
     void createOrder_shouldSaveOrderWithInitialStatusAndHistory() {
@@ -69,7 +66,7 @@ public class OrderServiceTest {
         assertThat(result).isSameAs(orderResponse);
 
         verify(orderRepository).save(orderCaptor.capture());
-        verify(orderStatusHistoryRepository).save(historyCaptor.capture());
+        verify(orderHistoryRepository).save(historyCaptor.capture());
 
         OrderEntity order = orderCaptor.getValue();
 
@@ -85,7 +82,7 @@ public class OrderServiceTest {
         assertThat(order.getOrderItems().getFirst().getTotalPrice()).isEqualByComparingTo("888.88");
         assertThat(order.getOrderItems().getFirst().getOrder()).isSameAs(order);
 
-        OrderStatusHistoryEntity history = historyCaptor.getValue();
+        OrderHistoryEntity history = historyCaptor.getValue();
 
         assertThat(history.getOrder()).isSameAs(order);
         assertThat(history.getNewStatus()).isEqualTo(OrderStatus.WAITING_FOR_INVENTORY);
@@ -112,7 +109,7 @@ public class OrderServiceTest {
         assertThat(result).isSameAs(orderResponse);
 
         verify(orderRepository).save(orderCaptor.capture());
-        verify(orderStatusHistoryRepository).save(any(OrderStatusHistoryEntity.class));
+        verify(orderHistoryRepository).save(any(OrderHistoryEntity.class));
 
         OrderEntity order = orderCaptor.getValue();
 
@@ -151,6 +148,71 @@ public class OrderServiceTest {
 
         verify(orderRepository).findById(orderId);
         verifyNoInteractions(orderMapper);
+    }
+
+    @Test
+    void getOrderHistoryById_existingOrder_shouldReturnMappedResponse() {
+        UUID orderId = UUID.randomUUID();
+
+        List<OrderHistoryResponse> response = createOrderHistoryResponse();
+        List<OrderHistoryEntity> history = List.of(new OrderHistoryEntity());
+
+        when(orderRepository.existsById(orderId)).thenReturn(true);
+        when(orderHistoryRepository.findOrderHistoryByIdByCreatedTimeAsc(orderId)).thenReturn(history);
+        when(orderMapper.toOrderHistoryResponseList(history)).thenReturn(response);
+
+        List<OrderHistoryResponse> result = orderService.getOrderHistoryById(orderId);
+
+        assertThat(result).isSameAs(response);
+
+        verify(orderRepository).existsById(orderId);
+        verify(orderHistoryRepository).findOrderHistoryByIdByCreatedTimeAsc(orderId);
+    }
+
+
+    @Test
+    void getOrderHistoryById_missingOrder_shouldThrowOrderNotFoundException() {
+        UUID orderId = UUID.randomUUID();
+
+        when(orderRepository.existsById(orderId)).thenReturn(false);
+
+        assertThatThrownBy(() -> orderService.getOrderHistoryById(orderId))
+                .isInstanceOf(OrderNotFoundException.class);
+
+        verify(orderRepository).existsById(orderId);
+        verifyNoInteractions(orderHistoryRepository);
+        verifyNoInteractions(orderMapper);
+    }
+
+    private List<OrderHistoryResponse> createOrderHistoryResponse() {
+        OrderHistoryResponse historyItem1 = new OrderHistoryResponse(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                null,
+                OrderStatus.WAITING_FOR_INVENTORY,
+                "test reason",
+                Instant.now()
+        );
+
+        OrderHistoryResponse historyItem2 = new OrderHistoryResponse(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                OrderStatus.WAITING_FOR_INVENTORY,
+                OrderStatus.WAITING_FOR_PAYMENT,
+                "test reason2",
+                Instant.now()
+        );
+
+        OrderHistoryResponse historyItem3 = new OrderHistoryResponse(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                OrderStatus.WAITING_FOR_PAYMENT,
+                OrderStatus.PAYMENT_FAILED,
+                "test reason3",
+                Instant.now()
+        );
+
+        return List.of(historyItem1, historyItem2, historyItem3);
     }
 
 

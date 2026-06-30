@@ -16,7 +16,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @Entity
 @Table(name = "order_status_history")
-public class OrderStatusHistoryEntity {
+public class OrderHistoryEntity {
     @Id
     @UuidGenerator
     @GeneratedValue
@@ -42,18 +42,20 @@ public class OrderStatusHistoryEntity {
     @Column(name = "created_at")
     private Instant createdAt;
 
-    public static OrderStatusHistoryEntity create(
+    public static OrderHistoryEntity create(
             OrderEntity order,
-            OrderStatus status,
+            OrderStatus oldStatus,
+            OrderStatus newStatus,
             OrderChangeHistoryReason reason,
             Instant time
     ) {
-        OrderStatusHistoryEntity orderStatusHistoryEntity = new OrderStatusHistoryEntity();
-        orderStatusHistoryEntity.setCreatedAt(time);
-        orderStatusHistoryEntity.setOrder(order);
-        orderStatusHistoryEntity.setNewStatus(status);
-        orderStatusHistoryEntity.setReason(reason);
+        OrderHistoryEntity orderHistoryEntity = new OrderHistoryEntity();
+        orderHistoryEntity.setCreatedAt(time);
+        orderHistoryEntity.setOrder(order);
+        orderHistoryEntity.setOldStatus(oldStatus);
+        orderHistoryEntity.setNewStatus(newStatus);
+        orderHistoryEntity.setReason(reason);
 
-        return orderStatusHistoryEntity;
+        return orderHistoryEntity;
     }
 }

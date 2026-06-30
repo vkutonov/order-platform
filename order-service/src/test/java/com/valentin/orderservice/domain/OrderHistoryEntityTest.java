@@ -6,19 +6,19 @@ import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class OrderStatusHistoryEntityTest {
+public class OrderHistoryEntityTest {
 
     @Test
     public void create_shouldPopulateHistoryFields() {
         OrderEntity order = new OrderEntity();
         Instant createdAt = Instant.parse("2026-06-29T10:15:30Z");
 
-        OrderStatusHistoryEntity history = OrderStatusHistoryEntity.create(
+        OrderHistoryEntity history = OrderHistoryEntity.create(
                 order,
+                null,
                 OrderStatus.WAITING_FOR_INVENTORY,
                 OrderChangeHistoryReason.ORDER_CREATED,
-                createdAt
-        );
+                createdAt);
 
         assertThat(history.getOrder()).isSameAs(order);
         assertThat(history.getOldStatus()).isNull();

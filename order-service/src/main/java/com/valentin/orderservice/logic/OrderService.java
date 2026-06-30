@@ -1,10 +1,11 @@
 package com.valentin.orderservice.logic;
 
 import com.valentin.orderservice.db.OrderRepository;
-import com.valentin.orderservice.db.OrderStatusHistoryRepository;
+import com.valentin.orderservice.db.OrderHistoryRepository;
 import com.valentin.orderservice.domain.*;
 import com.valentin.orderservice.dto.CreateOrderItemRequest;
 import com.valentin.orderservice.dto.CreateOrderRequest;
+import com.valentin.orderservice.dto.OrderHistoryResponse;
 import com.valentin.orderservice.dto.OrderResponse;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.mapper.OrderMapper;
@@ -12,7 +13,9 @@ import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,18 +24,21 @@ import java.util.UUID;
 public class OrderService {
     private final OrderMapper mapper;
     private final OrderRepository orderRepository;
-    private final OrderStatusHistoryRepository orderStatusHistoryRepository;
+    private final OrderHistoryRepository orderHistoryRepository;
+
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest orderRequest) {
 
-        OrderEntity order = new OrderEntity();
         Instant instantNow = Instant.now();
-        order.setCreatedAt(instantNow);
-        order.setUpdatedAt(instantNow);
-        order.setUserId(orderRequest.userId());
-        order.setCurrency("RUB");
-        order.setStatus(OrderStatus.WAITING_FOR_INVENTORY);
+
+        OrderEntity order = OrderEntity.createOrderEntity(
+                orderRequest.userId(),
+                new ArrayList<>(),
+                OrderStatus.WAITING_FOR_INVENTORY,
+                new BigDecimal("0.00"),
+                "RUB"
+                );
 
         List<CreateOrderItemRequest> itemsRequest = orderRequest.items();
 
@@ -50,17 +56,18 @@ public class OrderService {
         order.setTotalPrice(order.recalculateTotalPrice());
         orderRepository.save(order);
 
-        OrderStatusHistoryEntity orderStatusHistory = OrderStatusHistoryEntity.create(
+        OrderHistoryEntity orderStatusHistory = OrderHistoryEntity.create(
                 order,
+                null,
                 OrderStatus.WAITING_FOR_INVENTORY,
                 OrderChangeHistoryReason.ORDER_CREATED,
-                instantNow
-        );
+                instantNow);
 
-        orderStatusHistoryRepository.save(orderStatusHistory);
+        orderHistoryRepository.save(orderStatusHistory);
 
         return mapper.toOrderResponse(order);
     }
+
 
     @Transactional(readOnly = true)
     public OrderResponse getOrderById(UUID orderId) {
@@ -68,5 +75,19 @@ public class OrderService {
         return mapper.toOrderResponse(orderRepository.findById(orderId).orElseThrow( () ->
                 new OrderNotFoundException("Order not found id = " + orderId))
         );
+    }
+
+
+    @Transactional(readOnly = true)
+    public List<OrderHistoryResponse> getOrderHistoryById(UUID orderId) {
+
+        if (!orderRepository.existsById(orderId)) {
+            throw new OrderNotFoundException("Order history not found id = " + orderId);
+        }
+
+        List<OrderHistoryEntity> orderHistories = orderHistoryRepository
+                .findOrderHistoryByIdByCreatedTimeAsc(orderId);
+
+        return mapper.toOrderHistoryResponseList(orderHistories);
     }
 }
