@@ -15,10 +15,10 @@ public class OrderHistoryEntityTest {
 
         OrderHistoryEntity history = OrderHistoryEntity.create(
                 order,
+                null,
                 OrderStatus.WAITING_FOR_INVENTORY,
                 OrderChangeHistoryReason.ORDER_CREATED,
-                createdAt
-        );
+                createdAt);
 
         assertThat(history.getOrder()).isSameAs(order);
         assertThat(history.getOldStatus()).isNull();
