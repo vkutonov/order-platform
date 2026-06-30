@@ -44,14 +44,16 @@ public class OrderHistoryEntity {
 
     public static OrderHistoryEntity create(
             OrderEntity order,
-            OrderStatus status,
+            OrderStatus oldStatus,
+            OrderStatus newStatus,
             OrderChangeHistoryReason reason,
             Instant time
     ) {
         OrderHistoryEntity orderHistoryEntity = new OrderHistoryEntity();
         orderHistoryEntity.setCreatedAt(time);
         orderHistoryEntity.setOrder(order);
-        orderHistoryEntity.setNewStatus(status);
+        orderHistoryEntity.setOldStatus(oldStatus);
+        orderHistoryEntity.setNewStatus(newStatus);
         orderHistoryEntity.setReason(reason);
 
         return orderHistoryEntity;

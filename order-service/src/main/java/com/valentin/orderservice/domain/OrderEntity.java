@@ -67,4 +67,26 @@ public class OrderEntity {
         orderItems.add(item);
         item.setOrder(this);
     }
+
+    public static OrderEntity createOrderEntity(
+        UUID userId,
+        List<OrderItemEntity> items,
+        OrderStatus status,
+        BigDecimal totalPrice,
+        String currency
+    ) {
+        OrderEntity order = new OrderEntity();
+
+        Instant timeNow = Instant.now();
+
+        order.setUserId(userId);
+        order.setOrderItems(items);
+        order.setTotalPrice(totalPrice);
+        order.setStatus(status);
+        order.setCurrency(currency);
+        order.setCreatedAt(timeNow);
+        order.setUpdatedAt(timeNow);
+
+        return order;
+    }
 }

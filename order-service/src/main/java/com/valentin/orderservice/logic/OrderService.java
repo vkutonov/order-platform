@@ -13,7 +13,9 @@ import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,16 +26,19 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final OrderHistoryRepository orderHistoryRepository;
 
+
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest orderRequest) {
 
-        OrderEntity order = new OrderEntity();
         Instant instantNow = Instant.now();
-        order.setCreatedAt(instantNow);
-        order.setUpdatedAt(instantNow);
-        order.setUserId(orderRequest.userId());
-        order.setCurrency("RUB");
-        order.setStatus(OrderStatus.WAITING_FOR_INVENTORY);
+
+        OrderEntity order = OrderEntity.createOrderEntity(
+                orderRequest.userId(),
+                new ArrayList<>(),
+                OrderStatus.WAITING_FOR_INVENTORY,
+                new BigDecimal("0.00"),
+                "RUB"
+                );
 
         List<CreateOrderItemRequest> itemsRequest = orderRequest.items();
 
@@ -53,15 +58,16 @@ public class OrderService {
 
         OrderHistoryEntity orderStatusHistory = OrderHistoryEntity.create(
                 order,
+                null,
                 OrderStatus.WAITING_FOR_INVENTORY,
                 OrderChangeHistoryReason.ORDER_CREATED,
-                instantNow
-        );
+                instantNow);
 
         orderHistoryRepository.save(orderStatusHistory);
 
         return mapper.toOrderResponse(order);
     }
+
 
     @Transactional(readOnly = true)
     public OrderResponse getOrderById(UUID orderId) {
@@ -70,6 +76,7 @@ public class OrderService {
                 new OrderNotFoundException("Order not found id = " + orderId))
         );
     }
+
 
     @Transactional(readOnly = true)
     public List<OrderHistoryResponse> getOrderHistoryById(UUID orderId) {
