@@ -30,6 +30,16 @@ public class OrderController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/{id}/history")
+    public ResponseEntity<List<OrderHistoryResponse>> getOrderHistoryById(
+            @PathVariable UUID id
+    ) {
+        log.info("LOG: called getOrderHistoryById");
+
+        List<OrderHistoryResponse> response = orderService.getOrderHistoryById(id);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(
             @Valid @RequestBody CreateOrderRequest request
@@ -40,13 +50,14 @@ public class OrderController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @GetMapping("/{id}/history")
-    public ResponseEntity<List<OrderHistoryResponse>> getOrderHistoryById(
+    @PostMapping("/{id}/reserve")
+    public ResponseEntity<OrderResponse> reserveInventory(
             @PathVariable UUID id
     ) {
-        log.info("LOG: called getOrderHistoryById");
+        log.info("LOG: called reserveInventory");
 
-        List<OrderHistoryResponse> response = orderService.getOrderHistoryById(id);
-        return ResponseEntity.ok(response);
+        orderService.reserveInventory(id);
+
+        return ResponseEntity.ok().build();
     }
 }

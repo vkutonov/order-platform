@@ -7,6 +7,7 @@ import com.valentin.orderservice.dto.CreateOrderItemRequest;
 import com.valentin.orderservice.dto.CreateOrderRequest;
 import com.valentin.orderservice.dto.OrderHistoryResponse;
 import com.valentin.orderservice.dto.OrderResponse;
+import com.valentin.orderservice.exception.OrderInvalidStatusException;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.mapper.OrderMapper;
 import lombok.AllArgsConstructor;
@@ -68,13 +69,47 @@ public class OrderService {
         return mapper.toOrderResponse(order);
     }
 
+    @Transactional
+    public void reserveInventory(UUID id) {
+        OrderEntity order = findOrder(id);
+
+        if (order.getStatus() != OrderStatus.WAITING_FOR_INVENTORY) {
+            throw new OrderInvalidStatusException("Order status must be WAITING_FOR_INVENTORY id = " + id);
+        }
+
+        changeStatus(
+                order,
+                OrderStatus.WAITING_FOR_PAYMENT,
+                OrderChangeHistoryReason.INVENTORY_RESERVED
+        );
+    }
+
+
+    private void changeStatus(
+            OrderEntity order,
+            OrderStatus status,
+            OrderChangeHistoryReason reason
+    ) {
+        Instant timeNow = Instant.now();
+
+        OrderHistoryEntity history = OrderHistoryEntity.create(
+                order,
+                order.getStatus(),
+                status,
+                reason,
+                timeNow
+        );
+
+        order.setStatus(status);
+        order.setUpdatedAt(timeNow);
+
+        orderHistoryRepository.save(history);
+    }
 
     @Transactional(readOnly = true)
-    public OrderResponse getOrderById(UUID orderId) {
+    public OrderResponse getOrderById(UUID id) {
 
-        return mapper.toOrderResponse(orderRepository.findById(orderId).orElseThrow( () ->
-                new OrderNotFoundException("Order not found id = " + orderId))
-        );
+        return mapper.toOrderResponse(findOrder(id));
     }
 
 
@@ -89,5 +124,12 @@ public class OrderService {
                 .findOrderHistoryByIdByCreatedTimeAsc(orderId);
 
         return mapper.toOrderHistoryResponseList(orderHistories);
+    }
+
+
+    private OrderEntity findOrder(UUID id) {
+        return orderRepository.findById(id).orElseThrow(() ->
+                new OrderNotFoundException("Order not found id = " + id)
+        );
     }
 }
