@@ -130,6 +130,30 @@ class OrderControllerIntegrationTest {
     }
 
     @Test
+    void reserveInventory_whenOrderHasInvalidStatus_returnsConflict() throws Exception {
+        String createResponse = mockMvc.perform(post("/api/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCreateOrderJson()))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String orderId = JsonPath.read(createResponse, "$.id");
+
+        mockMvc.perform(post("/api/orders/{id}/reserve", orderId))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/orders/{id}/reserve", orderId))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.error").value("Conflict"))
+                .andExpect(jsonPath("$.message").value("Order status must be WAITING_FOR_INVENTORY id = " + orderId))
+                .andExpect(jsonPath("$.path").value("/api/orders/" + orderId + "/reserve"));
+    }
+
+    @Test
     void createOrder_whenRequestIsInvalid_returnsValidationError() throws Exception {
         String invalidRequest = """
                 {
