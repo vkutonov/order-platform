@@ -7,6 +7,7 @@ import com.valentin.orderservice.domain.OrderEntity;
 import com.valentin.orderservice.domain.OrderHistoryEntity;
 import com.valentin.orderservice.domain.OrderStatus;
 import com.valentin.orderservice.dto.*;
+import com.valentin.orderservice.exception.OrderInvalidStatusException;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.mapper.OrderMapper;
 import org.junit.jupiter.api.Test;
@@ -19,12 +20,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -238,6 +239,76 @@ public class OrderServiceTest {
         );
     }
 
+
+    @Test
+    void reserveInventory_shouldChangeStatusAndSaveHistory() {
+
+        UUID userId = UUID.randomUUID();
+
+        OrderEntity order = OrderEntity.createOrderEntity(
+                userId,
+                new ArrayList<>(),
+                OrderStatus.WAITING_FOR_INVENTORY,
+                new BigDecimal("44.44"),
+                "RUB"
+        );
+
+        when(orderRepository.findById(order.getId()))
+                .thenReturn(Optional.of(order));
+
+        orderService.reserveInventory(order.getId());
+
+        assertThat(order.getUpdatedAt()).isNotEqualTo(order.getCreatedAt());
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.WAITING_FOR_PAYMENT);
+
+        verify(orderRepository).findById(order.getId());
+        verify(orderHistoryRepository).save(historyCaptor.capture());
+
+        OrderHistoryEntity history = historyCaptor.getValue();
+
+        assertThat(history.getOrder()).isSameAs(order);
+        assertThat(history.getCreatedAt()).isNotNull();
+        assertThat(history.getOldStatus()).isEqualTo(OrderStatus.WAITING_FOR_INVENTORY);
+        assertThat(history.getNewStatus()).isEqualTo(OrderStatus.WAITING_FOR_PAYMENT);
+        assertThat(history.getReason()).isEqualTo(OrderChangeHistoryReason.INVENTORY_RESERVED);
+
+    }
+
+
+    @Test
+    void reserveInventory_shouldThrowOrderNotFoundException() {
+        UUID orderId = UUID.randomUUID();
+
+        when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.reserveInventory(orderId))
+                .isInstanceOf(OrderNotFoundException.class);
+
+        verify(orderRepository).findById(orderId);
+        verifyNoInteractions(orderHistoryRepository);
+    }
+
+
+    @Test
+    void reserveInventory_shouldThrowOrderInvalidStatusException() {
+        UUID userId = UUID.randomUUID();
+
+        OrderEntity order = OrderEntity.createOrderEntity(
+                userId,
+                new ArrayList<>(),
+                OrderStatus.WAITING_FOR_PAYMENT,
+                new BigDecimal("44.44"),
+                "RUB"
+        );
+
+        when(orderRepository.findById(order.getId()))
+                .thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.reserveInventory(order.getId()))
+                .isInstanceOf(OrderInvalidStatusException.class);
+
+        verify(orderRepository).findById(order.getId());
+    }
 
     private CreateOrderRequest createValidRequest() {
         CreateOrderItemRequest item1 = new CreateOrderItemRequest(
