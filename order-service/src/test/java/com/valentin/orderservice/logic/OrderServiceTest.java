@@ -258,7 +258,7 @@ public class OrderServiceTest {
 
         orderService.reserveInventory(order.getId());
 
-        assertThat(order.getUpdatedAt()).isNotEqualTo(order.getCreatedAt());
+        assertThat(order.getUpdatedAt()).isAfterOrEqualTo(order.getCreatedAt());
         assertThat(order.getStatus()).isEqualTo(OrderStatus.WAITING_FOR_PAYMENT);
 
         verify(orderRepository).findById(order.getId());

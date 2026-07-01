@@ -40,7 +40,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(OrderInvalidStatusException.class)
     public ResponseEntity<ErrorResponse> handleOrderInvalidStatus(
-            OrderNotFoundException exception,
+            OrderInvalidStatusException exception,
             HttpServletRequest request
     ) {
         HttpStatus status = HttpStatus.CONFLICT;
