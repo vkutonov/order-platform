@@ -1,8 +1,6 @@
 package com.valentin.orderservice.api;
 
-import com.valentin.orderservice.dto.CreateOrderRequest;
-import com.valentin.orderservice.dto.OrderHistoryResponse;
-import com.valentin.orderservice.dto.OrderResponse;
+import com.valentin.orderservice.dto.*;
 import com.valentin.orderservice.logic.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,8 +24,19 @@ public class OrderController {
             @PathVariable UUID id
     ) {
         log.info("LOG: called getOrderById");
+
         OrderResponse response = orderService.getOrderById(id);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<OrderSummaryResponseList> getOrdersByUserId(
+            @PathVariable UUID userId
+    ) {
+        log.info("LOG: called getOrdersByUserId");
+
+        OrderSummaryResponseList orders = orderService.getOrdersByUserId(userId);
+        return ResponseEntity.ok(orders);
     }
 
     @GetMapping("/{id}/history")
@@ -45,8 +54,8 @@ public class OrderController {
             @Valid @RequestBody CreateOrderRequest request
     ) {
         log.info("LOG: called createOrder");
-        OrderResponse response = orderService.createOrder(request);
 
+        OrderResponse response = orderService.createOrder(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -57,7 +66,6 @@ public class OrderController {
         log.info("LOG: called reserveInventory");
 
         orderService.reserveInventory(id);
-
         return ResponseEntity.ok().build();
     }
 }

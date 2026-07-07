@@ -3,10 +3,7 @@ package com.valentin.orderservice.logic;
 import com.valentin.orderservice.db.OrderRepository;
 import com.valentin.orderservice.db.OrderHistoryRepository;
 import com.valentin.orderservice.domain.*;
-import com.valentin.orderservice.dto.CreateOrderItemRequest;
-import com.valentin.orderservice.dto.CreateOrderRequest;
-import com.valentin.orderservice.dto.OrderHistoryResponse;
-import com.valentin.orderservice.dto.OrderResponse;
+import com.valentin.orderservice.dto.*;
 import com.valentin.orderservice.exception.OrderInvalidStatusException;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.mapper.OrderMapper;
@@ -126,6 +123,23 @@ public class OrderService {
         return mapper.toOrderHistoryResponseList(orderHistories);
     }
 
+    @Transactional(readOnly = true)
+    public OrderSummaryResponseList getOrdersByUserId(UUID userId) {
+        List<OrderEntity> orders = orderRepository.findByUserIdOrderByCreatedAtAsc(userId);
+
+        BigDecimal totalPrice = BigDecimal.ZERO;
+
+        for (OrderEntity order : orders) {
+            totalPrice = totalPrice.add(order.getTotalPrice());
+        }
+
+        List<OrderSummaryResponse> orderSummaryResponses = mapper.toOrderSummaryResponses(orders);
+
+        return new OrderSummaryResponseList(
+                totalPrice,
+                orderSummaryResponses
+        );
+    }
 
     private OrderEntity findOrder(UUID id) {
         return orderRepository.findById(id).orElseThrow(() ->
