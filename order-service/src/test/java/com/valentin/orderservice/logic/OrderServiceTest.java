@@ -151,6 +151,71 @@ public class OrderServiceTest {
         verifyNoInteractions(orderMapper);
     }
 
+
+    @Test
+    void getOrdersByUserId_existingOrders_shouldReturnMappedResponses() {
+        UUID userId = UUID.randomUUID();
+        Instant timeNow = Instant.now();
+
+        OrderEntity entity = OrderEntity.createOrderEntity(
+                userId,
+                new ArrayList<>(),
+                OrderStatus.WAITING_FOR_INVENTORY,
+                new BigDecimal("100.00"),
+                "RUB"
+        );
+
+        OrderSummaryResponse response = new OrderSummaryResponse(
+                entity.getId(),
+                userId,
+                OrderStatus.WAITING_FOR_INVENTORY,
+                new BigDecimal("100.00"),
+                "RUB",
+                timeNow,
+                timeNow
+        );
+
+        List<OrderEntity> entities = List.of(entity);
+        List<OrderSummaryResponse> responses = List.of(response);
+
+        when(orderRepository.findByUserIdOrderByCreatedAtAsc(userId))
+                .thenReturn(entities);
+
+        when(orderMapper.toOrderSummaryResponses(entities))
+                .thenReturn(responses);
+
+        OrderSummaryResponseList result = orderService.getOrdersByUserId(userId);
+
+        assertThat(result.totalPrice()).isEqualByComparingTo("100.00");
+        assertThat(result.orderSummaryResponses()).containsExactly(response);
+
+        verify(orderRepository).findByUserIdOrderByCreatedAtAsc(userId);
+        verify(orderMapper).toOrderSummaryResponses(entities);
+    }
+
+
+    @Test
+    void getOrdersByUserId_noOrders_shouldReturnEmptyList() {
+        UUID userId = UUID.randomUUID();
+
+        List<OrderEntity> entities = List.of();
+        List<OrderSummaryResponse> responses = List.of();
+
+        when(orderRepository.findByUserIdOrderByCreatedAtAsc(userId))
+                .thenReturn(entities);
+
+        when(orderMapper.toOrderSummaryResponses(entities))
+                .thenReturn(responses);
+
+        OrderSummaryResponseList result = orderService.getOrdersByUserId(userId);
+
+        assertThat(result.totalPrice()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(result.orderSummaryResponses()).isEmpty();
+
+        verify(orderRepository).findByUserIdOrderByCreatedAtAsc(userId);
+        verify(orderMapper).toOrderSummaryResponses(entities);
+    }
+
     @Test
     void getOrderHistoryById_existingOrder_shouldReturnMappedResponse() {
         UUID orderId = UUID.randomUUID();

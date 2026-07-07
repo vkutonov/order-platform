@@ -7,6 +7,7 @@ import com.valentin.orderservice.domain.OrderItemEntity;
 import com.valentin.orderservice.domain.OrderStatus;
 import com.valentin.orderservice.dto.OrderHistoryResponse;
 import com.valentin.orderservice.dto.OrderResponse;
+import com.valentin.orderservice.dto.OrderSummaryResponse;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 
@@ -94,5 +95,34 @@ class OrderMapperTest {
         assertThat(response.newStatus()).isEqualTo(OrderStatus.WAITING_FOR_PAYMENT);
         assertThat(response.reason()).isEqualTo("INVENTORY_RESERVED");
         assertThat(response.createdAt()).isEqualTo(createdAt);
+    }
+
+    @Test
+    void toOrderSummaryResponse_shouldMapOrderWithoutItems() {
+        UUID orderId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Instant createdAt = Instant.parse("2026-06-29T10:15:30Z");
+        Instant updatedAt = Instant.parse("2026-06-29T10:20:30Z");
+
+        OrderEntity order = OrderEntity.createOrderEntity(
+                userId,
+                new ArrayList<>(),
+                OrderStatus.WAITING_FOR_PAYMENT,
+                new BigDecimal("46.00"),
+                "RUB"
+        );
+        order.setId(orderId);
+        order.setCreatedAt(createdAt);
+        order.setUpdatedAt(updatedAt);
+
+        OrderSummaryResponse response = mapper.toOrderSummaryResponse(order);
+
+        assertThat(response.id()).isEqualTo(orderId);
+        assertThat(response.userId()).isEqualTo(userId);
+        assertThat(response.status()).isEqualTo(OrderStatus.WAITING_FOR_PAYMENT);
+        assertThat(response.totalPrice()).isEqualByComparingTo("46.00");
+        assertThat(response.currency()).isEqualTo("RUB");
+        assertThat(response.createdAt()).isEqualTo(createdAt);
+        assertThat(response.updatedAt()).isEqualTo(updatedAt);
     }
 }

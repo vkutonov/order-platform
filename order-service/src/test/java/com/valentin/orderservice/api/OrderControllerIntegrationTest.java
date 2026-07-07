@@ -17,6 +17,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,9 +33,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Testcontainers
 class OrderControllerIntegrationTest {
 
-    private static final UUID USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
-    private static final UUID FIRST_PRODUCT_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
-    private static final UUID SECOND_PRODUCT_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
+    private static final UUID USER_ID = UUID.randomUUID();
+    private static final UUID FIRST_PRODUCT_ID = UUID.randomUUID();
+    private static final UUID SECOND_PRODUCT_ID = UUID.randomUUID();
     private static final DockerImageName POSTGRES_IMAGE = DockerImageName.parse("postgres:18.4-bookworm");
 
     @Container
@@ -118,15 +119,52 @@ class OrderControllerIntegrationTest {
 
     @Test
     void getOrderById_whenOrderDoesNotExist_returnsNotFound() throws Exception {
-        String missingOrderId = "99999999-9999-9999-9999-999999999999";
+        UUID orderId = UUID.randomUUID();
 
-        mockMvc.perform(get("/api/orders/{id}", missingOrderId))
+        mockMvc.perform(get("/api/orders/{id}", orderId))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.error").value("Not Found"))
-                .andExpect(jsonPath("$.message").value("Order not found id = " + missingOrderId))
-                .andExpect(jsonPath("$.path").value("/api/orders/" + missingOrderId));
+                .andExpect(jsonPath("$.message").value("Order not found id = " + orderId))
+                .andExpect(jsonPath("$.path").value("/api/orders/" + orderId));
+    }
+
+    @Test
+    void getOrdersByUserId_whenUserHasOrders_returnsOnlyThatUserOrders() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        String firstOrderId = createOrderForUser(USER_ID);
+        String secondOrderId = createOrderForUser(USER_ID);
+        String userOrderId = createOrderForUser(userId);
+
+        String response = mockMvc.perform(get("/api/orders/user/{userId}", USER_ID))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.totalPrice").value(92.0))
+                .andExpect(jsonPath("$.orderSummaryResponses", hasSize(2)))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        List<String> orderIds = JsonPath.read(response, "$.orderSummaryResponses[*].id");
+        List<String> userIds = JsonPath.read(response, "$.orderSummaryResponses[*].userId");
+
+        assertThat(orderIds).containsExactlyInAnyOrder(firstOrderId, secondOrderId);
+        assertThat(orderIds).doesNotContain(userOrderId);
+        assertThat(userIds).containsOnly(USER_ID.toString());
+    }
+
+    @Test
+    void getOrdersByUserId_whenUserHasNoOrders_returnsEmptyList() throws Exception {
+        UUID randomUserId = UUID.randomUUID();
+
+        mockMvc.perform(get("/api/orders/user/{userId}", randomUserId))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.totalPrice").value(0))
+                .andExpect(jsonPath("$.orderSummaryResponses").isArray())
+                .andExpect(jsonPath("$.orderSummaryResponses", hasSize(0)));
     }
 
     @Test
@@ -174,7 +212,23 @@ class OrderControllerIntegrationTest {
                 .andExpect(jsonPath("$.fieldErrors", hasSize(2)));
     }
 
+    private String createOrderForUser(UUID userId) throws Exception {
+        String response = mockMvc.perform(post("/api/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCreateOrderJson(userId)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        return JsonPath.read(response, "$.id");
+    }
+
     private static String validCreateOrderJson() {
+        return validCreateOrderJson(USER_ID);
+    }
+
+    private static String validCreateOrderJson(UUID userId) {
         return """
                 {
                   "userId": "%s",
@@ -193,6 +247,6 @@ class OrderControllerIntegrationTest {
                     }
                   ]
                 }
-                """.formatted(USER_ID, FIRST_PRODUCT_ID, SECOND_PRODUCT_ID);
+                """.formatted(userId, FIRST_PRODUCT_ID, SECOND_PRODUCT_ID);
     }
 }
