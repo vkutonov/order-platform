@@ -180,14 +180,14 @@ class OrderControllerIntegrationTest {
         String orderId = JsonPath.read(createResponse, "$.id");
 
         mockMvc.perform(post("/api/orders/{id}/reserve", orderId))
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
 
         mockMvc.perform(post("/api/orders/{id}/reserve", orderId))
                 .andExpect(status().isConflict())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.error").value("Conflict"))
-                .andExpect(jsonPath("$.message").value("Order status must be WAITING_FOR_INVENTORY id = " + orderId))
+                .andExpect(jsonPath("$.message").value("Order status mustn't be in WAITING_FOR_PAYMENT status"))
                 .andExpect(jsonPath("$.path").value("/api/orders/" + orderId + "/reserve"));
     }
 

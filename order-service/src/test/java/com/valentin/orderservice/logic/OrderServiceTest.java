@@ -51,7 +51,7 @@ public class OrderServiceTest {
     private ArgumentCaptor<OrderHistoryEntity> historyCaptor;
 
     @Test
-    void createOrder_shouldSaveOrderWithInitialStatusAndHistory() {
+    void createOrder_shouldCreateOrderWithCreatedStatus() {
 
         CreateOrderRequest orderRequest = createValidRequest();
         OrderResponse orderResponse = createOrderResponse();
@@ -306,27 +306,88 @@ public class OrderServiceTest {
 
 
     @Test
-    void reserveInventory_shouldChangeStatusAndSaveHistory() {
-
-        UUID userId = UUID.randomUUID();
-
-        OrderEntity order = OrderEntity.createOrderEntity(
-                userId,
-                new ArrayList<>(),
-                OrderStatus.WAITING_FOR_INVENTORY,
-                new BigDecimal("44.44"),
-                "RUB"
-        );
+    void reserveInventory_shouldChangeStatusToWaitingForPayment() {
+        OrderEntity order = orderWithStatus(OrderStatus.WAITING_FOR_INVENTORY);
 
         when(orderRepository.findById(order.getId()))
                 .thenReturn(Optional.of(order));
 
         orderService.reserveInventory(order.getId());
 
-        assertThat(order.getUpdatedAt()).isAfterOrEqualTo(order.getCreatedAt());
         assertThat(order.getStatus()).isEqualTo(OrderStatus.WAITING_FOR_PAYMENT);
+        assertThat(order.getUpdatedAt()).isAfterOrEqualTo(order.getCreatedAt());
 
         verify(orderRepository).findById(order.getId());
+    }
+
+    @Test
+    void markPaymentSucceeded_shouldChangeStatusToPaid() {
+        OrderEntity order = orderWithStatus(OrderStatus.WAITING_FOR_PAYMENT);
+
+        when(orderRepository.findById(order.getId()))
+                .thenReturn(Optional.of(order));
+
+        orderService.confirmPayment(order.getId());
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(order.getUpdatedAt()).isAfterOrEqualTo(order.getCreatedAt());
+
+        verify(orderRepository).findById(order.getId());
+    }
+
+    @Test
+    void markPaymentFailed_shouldChangeStatusToPaymentFailed() {
+        OrderEntity order = orderWithStatus(OrderStatus.WAITING_FOR_PAYMENT);
+
+        when(orderRepository.findById(order.getId()))
+                .thenReturn(Optional.of(order));
+
+        orderService.paymentFailed(order.getId());
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED);
+        assertThat(order.getUpdatedAt()).isAfterOrEqualTo(order.getCreatedAt());
+
+        verify(orderRepository).findById(order.getId());
+    }
+
+    @Test
+    void cancelOrder_shouldChangeStatusToCancelled() {
+        OrderEntity order = orderWithStatus(OrderStatus.WAITING_FOR_PAYMENT);
+
+        when(orderRepository.findById(order.getId()))
+                .thenReturn(Optional.of(order));
+
+        orderService.cancelOrder(order.getId());
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(order.getUpdatedAt()).isAfterOrEqualTo(order.getCreatedAt());
+
+        verify(orderRepository).findById(order.getId());
+    }
+
+    @Test
+    void invalidTransition_shouldThrowException() {
+        OrderEntity order = orderWithStatus(OrderStatus.WAITING_FOR_INVENTORY);
+
+        when(orderRepository.findById(order.getId()))
+                .thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.confirmPayment(order.getId()))
+                .isInstanceOf(OrderInvalidStatusException.class);
+
+        verify(orderRepository).findById(order.getId());
+        verifyNoInteractions(orderHistoryRepository);
+    }
+
+    @Test
+    void statusChange_shouldSaveHistory() {
+        OrderEntity order = orderWithStatus(OrderStatus.WAITING_FOR_INVENTORY);
+
+        when(orderRepository.findById(order.getId()))
+                .thenReturn(Optional.of(order));
+
+        orderService.reserveInventory(order.getId());
+
         verify(orderHistoryRepository).save(historyCaptor.capture());
 
         OrderHistoryEntity history = historyCaptor.getValue();
@@ -336,9 +397,7 @@ public class OrderServiceTest {
         assertThat(history.getOldStatus()).isEqualTo(OrderStatus.WAITING_FOR_INVENTORY);
         assertThat(history.getNewStatus()).isEqualTo(OrderStatus.WAITING_FOR_PAYMENT);
         assertThat(history.getReason()).isEqualTo(OrderChangeHistoryReason.INVENTORY_RESERVED);
-
     }
-
 
     @Test
     void reserveInventory_shouldThrowOrderNotFoundException() {
@@ -353,26 +412,14 @@ public class OrderServiceTest {
         verifyNoInteractions(orderHistoryRepository);
     }
 
-
-    @Test
-    void reserveInventory_shouldThrowOrderInvalidStatusException() {
-        UUID userId = UUID.randomUUID();
-
-        OrderEntity order = OrderEntity.createOrderEntity(
-                userId,
+    private OrderEntity orderWithStatus(OrderStatus status) {
+        return OrderEntity.createOrderEntity(
+                UUID.randomUUID(),
                 new ArrayList<>(),
-                OrderStatus.WAITING_FOR_PAYMENT,
+                status,
                 new BigDecimal("44.44"),
                 "RUB"
         );
-
-        when(orderRepository.findById(order.getId()))
-                .thenReturn(Optional.of(order));
-
-        assertThatThrownBy(() -> orderService.reserveInventory(order.getId()))
-                .isInstanceOf(OrderInvalidStatusException.class);
-
-        verify(orderRepository).findById(order.getId());
     }
 
     private CreateOrderRequest createValidRequest() {

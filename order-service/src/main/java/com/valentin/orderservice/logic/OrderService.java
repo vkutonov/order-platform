@@ -8,7 +8,6 @@ import com.valentin.orderservice.exception.OrderInvalidStatusException;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.mapper.OrderMapper;
 import lombok.AllArgsConstructor;
-import org.hibernate.query.Order;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
