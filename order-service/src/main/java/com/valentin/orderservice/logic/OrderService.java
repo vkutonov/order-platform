@@ -89,7 +89,7 @@ public class OrderService {
 
         changeStatus(
                 order,
-                OrderStatus.INVENTORY_RESERVATION_FAILED,
+                OrderStatus.CANCELLED,
                 OrderChangeHistoryReason.INVENTORY_RESERVATION_FAILED
         );
 
