@@ -59,13 +59,36 @@ public class OrderController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PostMapping("/{id}/reserve")
-    public ResponseEntity<OrderResponse> reserveInventory(
-            @PathVariable UUID id
-    ) {
-        log.info("LOG: called reserveInventory");
+    // Temporary endpoints for simulating Service events.
+    // Will be replaced by Kafka consumer.
 
+    @PostMapping("/{id}/reserve")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void reserveInventory(@PathVariable UUID id) {
         orderService.reserveInventory(id);
-        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/inventory-failed")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void inventoryReservationFailed(@PathVariable UUID id) {
+        orderService.inventoryReservationFailed(id);
+    }
+
+    @PostMapping("/{id}/payment-success")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void confirmPayment(@PathVariable UUID id) {
+        orderService.confirmPayment(id);
+    }
+
+    @PostMapping("/{id}/payment-failed")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void paymentFailed(@PathVariable UUID id) {
+        orderService.paymentFailed(id);
+    }
+
+    @PostMapping("/{id}/cancel")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void cancelOrder(@PathVariable UUID id) {
+        orderService.cancelOrder(id);
     }
 }
