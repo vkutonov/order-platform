@@ -8,6 +8,7 @@ import com.valentin.orderservice.exception.OrderInvalidStatusException;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.mapper.OrderMapper;
 import lombok.AllArgsConstructor;
+import org.hibernate.query.Order;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +16,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @AllArgsConstructor
@@ -36,7 +38,7 @@ public class OrderService {
                 OrderStatus.WAITING_FOR_INVENTORY,
                 new BigDecimal("0.00"),
                 "RUB"
-                );
+        );
 
         List<CreateOrderItemRequest> itemsRequest = orderRequest.items();
 
@@ -70,9 +72,7 @@ public class OrderService {
     public void reserveInventory(UUID id) {
         OrderEntity order = findOrder(id);
 
-        if (order.getStatus() != OrderStatus.WAITING_FOR_INVENTORY) {
-            throw new OrderInvalidStatusException("Order status must be WAITING_FOR_INVENTORY id = " + id);
-        }
+        validateStatus(order, OrderStatus.WAITING_FOR_INVENTORY);
 
         changeStatus(
                 order,
@@ -81,6 +81,66 @@ public class OrderService {
         );
     }
 
+    @Transactional
+    public void inventoryReservationFailed(UUID id) {
+        OrderEntity order = findOrder(id);
+
+        validateStatus(order, OrderStatus.WAITING_FOR_INVENTORY);
+
+        changeStatus(
+                order,
+                OrderStatus.INVENTORY_RESERVATION_FAILED,
+                OrderChangeHistoryReason.INVENTORY_RESERVATION_FAILED
+        );
+
+    }
+
+
+    @Transactional
+    public void confirmPayment(UUID id) {
+        OrderEntity order = findOrder(id);
+
+        validateStatus(order, OrderStatus.WAITING_FOR_PAYMENT);
+
+        changeStatus(
+                order,
+                OrderStatus.PAID,
+                OrderChangeHistoryReason.PAYMENT_SUCCEEDED
+        );
+    }
+
+    @Transactional
+    public void paymentFailed(UUID id) {
+        OrderEntity order = findOrder(id);
+
+        validateStatus(order, OrderStatus.WAITING_FOR_PAYMENT);
+
+        changeStatus(
+                order,
+                OrderStatus.PAYMENT_FAILED,
+                OrderChangeHistoryReason.PAYMENT_FAILED
+        );
+    }
+
+    @Transactional
+    public void cancelOrder(UUID id) {
+        OrderEntity order = findOrder(id);
+
+        validateStatusIn(
+                order,
+                Set.of(
+                        OrderStatus.WAITING_FOR_INVENTORY,
+                        OrderStatus.WAITING_FOR_PAYMENT,
+                        OrderStatus.PAID
+                )
+        );
+
+        changeStatus(
+                order,
+                OrderStatus.CANCELLED,
+                OrderChangeHistoryReason.ORDER_CANCELLED_BY_USER
+        );
+    }
 
     private void changeStatus(
             OrderEntity order,
@@ -101,6 +161,23 @@ public class OrderService {
         order.setUpdatedAt(timeNow);
 
         orderHistoryRepository.save(history);
+    }
+
+    // транзакция откатывается если выбрасывается Runtime исключение
+    private void validateStatusIn(OrderEntity order, Set<OrderStatus> allowedStatuses) {
+        if (!allowedStatuses.contains(order.getStatus())) {
+            throw new OrderInvalidStatusException(
+                    "Order status mustn't be in " + order.getStatus() + " status"
+            );
+        }
+    }
+
+    private void validateStatus(OrderEntity order, OrderStatus expectedStatus) {
+        if (order.getStatus() != expectedStatus) {
+            throw new OrderInvalidStatusException(
+                    "Order status mustn't be in " + order.getStatus() + " status"
+            );
+        }
     }
 
     @Transactional(readOnly = true)
