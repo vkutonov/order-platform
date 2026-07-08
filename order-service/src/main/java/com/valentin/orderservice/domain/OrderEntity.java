@@ -73,11 +73,10 @@ public class OrderEntity {
         List<OrderItemEntity> items,
         OrderStatus status,
         BigDecimal totalPrice,
-        String currency
+        String currency,
+        Instant timeNow
     ) {
         OrderEntity order = new OrderEntity();
-
-        Instant timeNow = Instant.now();
 
         order.setUserId(userId);
         order.setOrderItems(items);
