@@ -1,0 +1,74 @@
+name: Order Platform CI
+
+on:
+  pull_request:
+    branches:
+      - master
+
+  push:
+    branches:
+      - master
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - order-service
+          # - inventory-service
+          # - payment-service
+          # - notification-service
+          # - api-gateway
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ matrix.service }}
+
+    env:
+      JAVA_VERSION: '21'
+      SPRING_PROFILES_ACTIVE: test
+      GRADLE_OPTS: >-
+        -Dorg.gradle.daemon=false
+        -Dorg.gradle.console=plain
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Show Java version
+        run: java -version
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build and run tests
+        run: ./gradlew clean build --no-daemon --stacktrace
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.service }}-test-reports
+          path: |
+            ${{ matrix.service }}/build/reports/tests/
+            ${{ matrix.service }}/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
