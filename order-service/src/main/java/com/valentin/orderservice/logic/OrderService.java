@@ -30,15 +30,16 @@ public class OrderService {
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest orderRequest) {
 
-        Instant instantNow = Instant.now();
+        Instant timeNow = Instant.now();
 
         OrderEntity order = OrderEntity.createOrderEntity(
                 orderRequest.userId(),
                 new ArrayList<>(),
                 OrderStatus.WAITING_FOR_INVENTORY,
                 new BigDecimal("0.00"),
-                "RUB"
-                );
+                "RUB",
+                timeNow
+        );
 
         List<CreateOrderItemRequest> itemsRequest = orderRequest.items();
 
@@ -61,7 +62,8 @@ public class OrderService {
                 null,
                 OrderStatus.WAITING_FOR_INVENTORY,
                 OrderChangeHistoryReason.ORDER_CREATED,
-                instantNow);
+                timeNow
+        );
 
         orderHistoryRepository.save(orderStatusHistory);
 
@@ -72,7 +74,7 @@ public class OrderService {
     @Transactional(readOnly = true)
     public OrderResponse getOrderById(UUID orderId) {
 
-        return mapper.toOrderResponse(orderRepository.findById(orderId).orElseThrow( () ->
+        return mapper.toOrderResponse(orderRepository.findById(orderId).orElseThrow(() ->
                 new OrderNotFoundException("Order not found id = " + orderId))
         );
     }
