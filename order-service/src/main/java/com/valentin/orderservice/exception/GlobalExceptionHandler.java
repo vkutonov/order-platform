@@ -19,18 +19,24 @@ import java.util.List;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(OrderNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleOrderNotFound(
+    public ResponseEntity<ClientErrorResponse> handleOrderNotFound(
             OrderNotFoundException exception,
             HttpServletRequest request
     ) {
         HttpStatus status = HttpStatus.NOT_FOUND;
 
-        ErrorResponse response = new ErrorResponse(
-                Instant.now(),
-                status.value(),
-                status.getReasonPhrase(),
+        log.warn(
+                "Order not found: path={}, message={}",
+                request.getRequestURI(),
+                exception.getMessage()
+        );
+
+        ClientErrorResponse response = clientErrorResponse(
+                status,
+                "ORDER_NOT_FOUND",
                 exception.getMessage(),
-                request.getRequestURI()
+                request,
+                List.of()
         );
 
         return ResponseEntity
@@ -38,19 +44,28 @@ public class GlobalExceptionHandler {
                 .body(response);
     }
 
-    @ExceptionHandler(OrderInvalidStatusException.class)
-    public ResponseEntity<ErrorResponse> handleOrderInvalidStatus(
-            OrderInvalidStatusException exception,
+    @ExceptionHandler(InvalidOrderStatusTransitionException.class)
+    public ResponseEntity<ClientErrorResponse> handleInvalidOrderStatusTransition(
+            InvalidOrderStatusTransitionException exception,
             HttpServletRequest request
     ) {
         HttpStatus status = HttpStatus.CONFLICT;
 
-        ErrorResponse response = new ErrorResponse(
-                Instant.now(),
-                status.value(),
-                status.getReasonPhrase(),
-                exception.getMessage(),
-                request.getRequestURI()
+        log.warn(
+                "Invalid order status transition: path={}, orderId={}, currentStatus={}, requestedStatus={}",
+                request.getRequestURI(),
+                exception.getOrderId(),
+                exception.getCurrentStatus(),
+                exception.getRequestedStatus()
+        );
+
+        ClientErrorResponse response = clientErrorResponse(
+                status,
+                "INVALID_ORDER_STATUS_TRANSITION",
+                "Order cannot be moved from %s to %s"
+                        .formatted(exception.getCurrentStatus(), exception.getRequestedStatus()),
+                request,
+                List.of()
         );
 
         return ResponseEntity
@@ -59,7 +74,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ValidationErrorResponse> handleValidationException(
+    public ResponseEntity<ClientErrorResponse> handleValidationException(
             MethodArgumentNotValidException exception,
             HttpServletRequest request
     ) {
@@ -74,12 +89,17 @@ public class GlobalExceptionHandler {
                 ))
                 .toList();
 
-        ValidationErrorResponse response = new ValidationErrorResponse(
-                Instant.now(),
-                status.value(),
-                "Validation Failed",
-                "Request validation failed",
+        log.warn(
+                "Request validation failed: path={}, fieldErrorsCount={}",
                 request.getRequestURI(),
+                fieldErrors.size()
+        );
+
+        ClientErrorResponse response = clientErrorResponse(
+                status,
+                "VALIDATION_FAILED",
+                "Request validation failed",
+                request,
                 fieldErrors
         );
 
@@ -89,18 +109,24 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadable(
+    public ResponseEntity<ClientErrorResponse> handleHttpMessageNotReadable(
             HttpMessageNotReadableException exception,
             HttpServletRequest request
     ) {
         HttpStatus status = HttpStatus.BAD_REQUEST;
 
-        ErrorResponse response = new ErrorResponse(
-                Instant.now(),
-                status.value(),
-                status.getReasonPhrase(),
+        log.warn(
+                "Invalid request body: path={}, message={}",
+                request.getRequestURI(),
+                exception.getMostSpecificCause().getMessage()
+        );
+
+        ClientErrorResponse response = clientErrorResponse(
+                status,
+                "INVALID_REQUEST_BODY",
                 "Invalid request body",
-                request.getRequestURI()
+                request,
+                List.of()
         );
 
         return ResponseEntity
@@ -109,7 +135,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatch(
+    public ResponseEntity<ClientErrorResponse> handleMethodArgumentTypeMismatch(
             MethodArgumentTypeMismatchException exception,
             HttpServletRequest request
     ) {
@@ -117,12 +143,20 @@ public class GlobalExceptionHandler {
 
         String message = "Invalid value for parameter '" + exception.getName() + "'";
 
-        ErrorResponse response = new ErrorResponse(
-                Instant.now(),
-                status.value(),
-                status.getReasonPhrase(),
+        log.warn(
+                "Invalid method argument type: path={}, parameter={}, value={}, requiredType={}",
+                request.getRequestURI(),
+                exception.getName(),
+                exception.getValue(),
+                exception.getRequiredType() != null ? exception.getRequiredType().getSimpleName() : null
+        );
+
+        ClientErrorResponse response = clientErrorResponse(
+                status,
+                "INVALID_PARAMETER_VALUE",
                 message,
-                request.getRequestURI()
+                request,
+                List.of()
         );
 
         return ResponseEntity
@@ -131,7 +165,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ErrorResponse> handleNoResourceFound(
+    public ResponseEntity<ClientErrorResponse> handleNoResourceFound(
             NoResourceFoundException exception,
             HttpServletRequest request
     ) {
@@ -139,12 +173,17 @@ public class GlobalExceptionHandler {
 
         String message = "Resource not found";
 
-        ErrorResponse response = new ErrorResponse(
-                Instant.now(),
-                status.value(),
-                status.getReasonPhrase(),
-                message,
+        log.warn(
+                "Resource not found: path={}",
                 request.getRequestURI()
+        );
+
+        ClientErrorResponse response = clientErrorResponse(
+                status,
+                "RESOURCE_NOT_FOUND",
+                message,
+                request,
+                List.of()
         );
 
         return ResponseEntity
@@ -154,15 +193,19 @@ public class GlobalExceptionHandler {
 
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleUnexpectedException(
+    public ResponseEntity<ServerErrorResponse> handleUnexpectedException(
             Exception exception,
             HttpServletRequest request
     ) {
-        log.error("Unexpected error occurred", exception);
+        log.error(
+                "Unexpected error occurred: path={}",
+                request.getRequestURI(),
+                exception
+        );
 
         HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
 
-        ErrorResponse response = new ErrorResponse(
+        ServerErrorResponse response = new ServerErrorResponse(
                 Instant.now(),
                 status.value(),
                 status.getReasonPhrase(),
@@ -173,5 +216,23 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(status)
                 .body(response);
+    }
+
+    private ClientErrorResponse clientErrorResponse(
+            HttpStatus status,
+            String code,
+            String message,
+            HttpServletRequest request,
+            List<FieldErrorResponse> fieldErrors
+    ) {
+        return new ClientErrorResponse(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                code,
+                message,
+                request.getRequestURI(),
+                fieldErrors
+        );
     }
 }
