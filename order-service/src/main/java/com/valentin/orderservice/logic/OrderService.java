@@ -4,10 +4,10 @@ import com.valentin.orderservice.db.OrderRepository;
 import com.valentin.orderservice.db.OrderHistoryRepository;
 import com.valentin.orderservice.domain.*;
 import com.valentin.orderservice.dto.*;
-import com.valentin.orderservice.exception.OrderInvalidStatusException;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.mapper.OrderMapper;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,9 +15,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
+@Slf4j
 @AllArgsConstructor
 @Service
 public class OrderService {
@@ -35,7 +35,6 @@ public class OrderService {
                 orderRequest.userId(),
                 new ArrayList<>(),
                 OrderStatus.WAITING_FOR_INVENTORY,
-                new BigDecimal("0.00"),
                 "RUB"
         );
 
@@ -52,8 +51,13 @@ public class OrderService {
             order.addItem(orderItemEntity);
         }
 
-        order.setTotalPrice(order.recalculateTotalPrice());
         orderRepository.save(order);
+
+        log.info(
+                "Order created: orderId={}, status={}",
+                order.getId(),
+                order.getStatus()
+        );
 
         OrderHistoryEntity orderStatusHistory = OrderHistoryEntity.create(
                 order,
@@ -68,115 +72,151 @@ public class OrderService {
     }
 
     @Transactional
-    public void reserveInventory(UUID id) {
-        OrderEntity order = findOrder(id);
-
-        validateStatus(order, OrderStatus.WAITING_FOR_INVENTORY);
-
-        changeStatus(
-                order,
-                OrderStatus.WAITING_FOR_PAYMENT,
-                OrderChangeHistoryReason.INVENTORY_RESERVED
-        );
-    }
-
-    @Transactional
-    public void inventoryReservationFailed(UUID id) {
-        OrderEntity order = findOrder(id);
-
-        validateStatus(order, OrderStatus.WAITING_FOR_INVENTORY);
-
-        changeStatus(
-                order,
-                OrderStatus.CANCELLED,
-                OrderChangeHistoryReason.INVENTORY_RESERVATION_FAILED
-        );
-
-    }
-
-
-    @Transactional
-    public void confirmPayment(UUID id) {
-        OrderEntity order = findOrder(id);
-
-        validateStatus(order, OrderStatus.WAITING_FOR_PAYMENT);
-
-        changeStatus(
-                order,
-                OrderStatus.PAID,
-                OrderChangeHistoryReason.PAYMENT_SUCCEEDED
-        );
-    }
-
-    @Transactional
-    public void paymentFailed(UUID id) {
-        OrderEntity order = findOrder(id);
-
-        validateStatus(order, OrderStatus.WAITING_FOR_PAYMENT);
-
-        changeStatus(
-                order,
-                OrderStatus.PAYMENT_FAILED,
-                OrderChangeHistoryReason.PAYMENT_FAILED
-        );
-    }
-
-    @Transactional
-    public void cancelOrder(UUID id) {
-        OrderEntity order = findOrder(id);
-
-        validateStatusIn(
-                order,
-                Set.of(
-                        OrderStatus.WAITING_FOR_INVENTORY,
-                        OrderStatus.WAITING_FOR_PAYMENT,
-                        OrderStatus.PAID
-                )
-        );
-
-        changeStatus(
-                order,
-                OrderStatus.CANCELLED,
-                OrderChangeHistoryReason.ORDER_CANCELLED_BY_USER
-        );
-    }
-
-    private void changeStatus(
-            OrderEntity order,
-            OrderStatus status,
-            OrderChangeHistoryReason reason
-    ) {
+    public void reserveInventory(UUID orderId) {
+        OrderEntity order = findOrder(orderId);
         Instant timeNow = Instant.now();
 
-        OrderHistoryEntity history = OrderHistoryEntity.create(
+        OrderStatus oldStatus = order.getStatus();
+
+        order.markInventoryReserved(timeNow);
+
+        saveStatusHistory(
                 order,
+                oldStatus,
                 order.getStatus(),
-                status,
-                reason,
+                OrderChangeHistoryReason.INVENTORY_RESERVED,
                 timeNow
         );
 
-        order.setStatus(status);
-        order.setUpdatedAt(timeNow);
+        log.info(
+                "Order inventory reserved: orderId={}, oldStatus={}, newStatus={}",
+                orderId,
+                oldStatus,
+                order.getStatus()
+        );
+
+    }
+
+    @Transactional
+    public void inventoryReservationFailed(UUID orderId) {
+        OrderEntity order = findOrder(orderId);
+        Instant timeNow = Instant.now();
+
+        OrderStatus oldStatus = order.getStatus();
+
+        order.markInventoryReservationFailed(timeNow);
+
+        saveStatusHistory(
+                order,
+                oldStatus,
+                order.getStatus(),
+                OrderChangeHistoryReason.INVENTORY_RESERVATION_FAILED,
+                timeNow
+        );
+
+        log.info(
+                "Order inventory reservation failed: orderId={}, oldStatus={}, newStatus={}",
+                orderId,
+                oldStatus,
+                order.getStatus()
+        );
+
+    }
+
+
+    @Transactional
+    public void markPaymentSucceeded(UUID orderId) {
+        OrderEntity order = findOrder(orderId);
+
+        OrderStatus oldStatus = order.getStatus();
+        Instant timeNow = Instant.now();
+
+        order.markPaymentSucceeded(timeNow);
+
+        saveStatusHistory(
+                order,
+                oldStatus,
+                order.getStatus(),
+                OrderChangeHistoryReason.PAYMENT_SUCCEEDED,
+                timeNow
+        );
+
+        log.info(
+                "Order payment succeeded: orderId={}, oldStatus={}, newStatus={}",
+                orderId,
+                oldStatus,
+                order.getStatus()
+        );
+    }
+
+    @Transactional
+    public void markPaymentFailed(UUID orderId) {
+        OrderEntity order = findOrder(orderId);
+
+        OrderStatus oldStatus = order.getStatus();
+        Instant timeNow = Instant.now();
+
+        order.markPaymentFailed(timeNow);
+
+        saveStatusHistory(
+                order,
+                oldStatus,
+                order.getStatus(),
+                OrderChangeHistoryReason.PAYMENT_FAILED,
+                timeNow
+        );
+
+        log.info(
+                "Order payment failed: orderId={}, oldStatus={}, newStatus={}",
+                orderId,
+                oldStatus,
+                order.getStatus()
+        );
+    }
+
+    @Transactional
+    public void cancelOrder(UUID orderId) {
+        OrderEntity order = findOrder(orderId);
+
+        OrderStatus oldStatus = order.getStatus();
+        Instant timeNow = Instant.now();
+
+        order.cancel(timeNow);
+
+        saveStatusHistory(
+                order,
+                oldStatus,
+                order.getStatus(),
+                OrderChangeHistoryReason.ORDER_CANCELLED_BY_USER,
+                timeNow
+        );
+
+        log.info(
+                "Order cancelled: orderId={}, oldStatus={}, newStatus={}",
+                orderId,
+                oldStatus,
+                order.getStatus()
+        );
+
+    }
+
+
+    private void saveStatusHistory(
+            OrderEntity order,
+            OrderStatus oldStatus,
+            OrderStatus newStatus,
+            OrderChangeHistoryReason reason,
+            Instant createdAt
+    ) {
+        OrderHistoryEntity history = OrderHistoryEntity.create(
+                order,
+                oldStatus,
+                newStatus,
+                reason,
+                createdAt
+        );
 
         orderHistoryRepository.save(history);
-    }
-
-    // транзакция откатывается если выбрасывается Runtime исключение
-    private void validateStatusIn(OrderEntity order, Set<OrderStatus> allowedStatuses) {
-        if (!allowedStatuses.contains(order.getStatus())) {
-            throw new OrderInvalidStatusException(
-                    "Order status mustn't be in " + order.getStatus() + " status"
-            );
-        }
-    }
-
-    private void validateStatus(OrderEntity order, OrderStatus expectedStatus) {
-        if (order.getStatus() != expectedStatus) {
-            throw new OrderInvalidStatusException(
-                    "Order status mustn't be in " + order.getStatus() + " status"
-            );
-        }
     }
 
     @Transactional(readOnly = true)

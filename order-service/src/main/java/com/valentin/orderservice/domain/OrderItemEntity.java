@@ -4,14 +4,12 @@ package com.valentin.orderservice.domain;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
 @Getter
-@Setter
 @NoArgsConstructor
 @Entity
 @Table(name = "order_items")
@@ -42,6 +40,9 @@ public class OrderItemEntity {
     @Column(name = "total_price", precision = 19, scale = 2)
     private BigDecimal totalPrice;
 
+    void setReferenceToOrder(OrderEntity order) {
+        this.order = order;
+    }
 
     public static OrderItemEntity create(
             UUID productId,
@@ -50,11 +51,11 @@ public class OrderItemEntity {
             Integer quantity
     ) {
         OrderItemEntity orderItem = new OrderItemEntity();
-        orderItem.setProductId(productId);
-        orderItem.setProductName(productName);
-        orderItem.setUnitPrice(unitPrice);
-        orderItem.setQuantity(quantity);
-        orderItem.setTotalPrice(unitPrice.multiply(BigDecimal.valueOf(quantity)));
+        orderItem.productId = productId;
+        orderItem.productName = productName;
+        orderItem.unitPrice = unitPrice;
+        orderItem.quantity = quantity;
+        orderItem.totalPrice = unitPrice.multiply(BigDecimal.valueOf(quantity));
 
         return orderItem;
     }
