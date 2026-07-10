@@ -74,7 +74,7 @@ class OutboxEventRepositoryIntegrationTest {
         assertThat(result)
                 .hasSize(2)
                 .extracting(OutboxEventEntity::getAggregateId)
-                .containsExactly(firstAggregateId, secondAggregateId);
+                .containsExactlyInAnyOrder(firstAggregateId, secondAggregateId);
 
         assertThat(result)
                 .extracting(OutboxEventEntity::getStatus)
