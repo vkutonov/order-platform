@@ -2,11 +2,15 @@ package com.valentin.orderservice.logic;
 
 import com.valentin.orderservice.db.OrderRepository;
 import com.valentin.orderservice.db.OrderHistoryRepository;
-import com.valentin.orderservice.domain.OrderChangeHistoryReason;
+import com.valentin.orderservice.db.OutboxEventRepository;
+import com.valentin.orderservice.domain.OutboxEventEntity;
+import com.valentin.orderservice.domain.dictionary.OrderChangeHistoryReason;
 import com.valentin.orderservice.domain.OrderEntity;
 import com.valentin.orderservice.domain.OrderHistoryEntity;
 import com.valentin.orderservice.domain.OrderItemEntity;
-import com.valentin.orderservice.domain.OrderStatus;
+import com.valentin.orderservice.domain.dictionary.OrderStatus;
+import com.valentin.orderservice.domain.dictionary.OutboxEventStatus;
+import com.valentin.orderservice.domain.event.OrderCreatedEvent;
 import com.valentin.orderservice.dto.*;
 import com.valentin.orderservice.exception.InvalidOrderStatusTransitionException;
 import com.valentin.orderservice.exception.OrderNotFoundException;
@@ -19,13 +23,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,7 +43,13 @@ public class OrderServiceTest {
     private OrderHistoryRepository orderHistoryRepository;
 
     @Mock
+    private OutboxEventRepository outboxEventRepository;
+
+    @Mock
     private OrderMapper orderMapper;
+
+    @Mock
+    private ObjectMapper objectMapper;
 
     @InjectMocks
     private OrderService orderService;
@@ -51,6 +59,12 @@ public class OrderServiceTest {
 
     @Captor
     private ArgumentCaptor<OrderHistoryEntity> historyCaptor;
+
+    @Captor
+    private ArgumentCaptor<OutboxEventEntity> outboxEventCaptor;
+
+    @Captor
+    private ArgumentCaptor<OrderCreatedEvent> orderCreatedEventCaptor;
 
     @Test
     void createOrder_shouldCreateOrderWithCreatedStatus() {
@@ -120,6 +134,62 @@ public class OrderServiceTest {
         assertThat(order.getTotalPrice()).isEqualByComparingTo("46.00");
     }
 
+
+    @Test
+    void createOrder_shouldCreateOutboxEvent(){
+
+        Instant timeNow = Instant.now();
+
+        CreateOrderRequest request = createValidRequestWithMultipleItems();
+
+        OrderEntity order = OrderEntity.createOrderEntity(
+                request.userId(),
+                new ArrayList<>(),
+                OrderStatus.WAITING_FOR_INVENTORY,
+                "RUB",
+                timeNow
+        );
+
+        ReflectionTestUtils.setField(order, "id", UUID.randomUUID());
+
+        String payload = """
+            {
+              "eventId": "11111111-1111-1111-1111-111111111111",
+              "orderId": "%s",
+              "context": {
+                "source": "order-service"
+              },
+              "occurredAt": "%s"
+            }
+            """.formatted(order.getId(), timeNow);
+
+        when(orderRepository.save(any(OrderEntity.class)))
+                .thenReturn(order);
+        when(objectMapper.writeValueAsString(any(OrderCreatedEvent.class)))
+                .thenReturn(payload);
+
+        orderService.createOrder(request);
+
+        verify(outboxEventRepository).save(outboxEventCaptor.capture());
+
+        OutboxEventEntity outboxEvent = outboxEventCaptor.getValue();
+
+        assertThat(outboxEvent.getAggregateType()).isSameAs("Order");
+        assertThat(outboxEvent.getAggregateId()).isEqualTo(order.getId());
+        assertThat(outboxEvent.getEventType()).isEqualTo("OrderCreatedEvent");
+        assertThat(outboxEvent.getStatus()).isEqualTo(OutboxEventStatus.NEW);
+        assertThat(outboxEvent.getPayload()).contains(order.getId().toString());
+        assertThat(outboxEvent.getCreatedAt()).isAfterOrEqualTo(timeNow);
+
+        verify(objectMapper).writeValueAsString(orderCreatedEventCaptor.capture());
+
+        OrderCreatedEvent event = orderCreatedEventCaptor.getValue();
+
+        assertThat(event.orderId()).isEqualTo(order.getId());
+        assertThat(event.context()).containsEntry("source", "order-service");
+        assertThat(event.occurredAt()).isNotNull();
+        assertThat(event.eventId()).isNotNull();
+    }
 
     @Test
     void getOrderById_existingOrder_shouldReturnMappedResponse() {

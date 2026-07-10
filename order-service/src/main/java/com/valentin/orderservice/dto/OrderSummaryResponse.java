@@ -1,6 +1,6 @@
 package com.valentin.orderservice.dto;
 
-import com.valentin.orderservice.domain.OrderStatus;
+import com.valentin.orderservice.domain.dictionary.OrderStatus;
 
 import java.math.BigDecimal;
 import java.time.Instant;

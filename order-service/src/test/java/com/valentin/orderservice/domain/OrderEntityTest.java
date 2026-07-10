@@ -1,7 +1,7 @@
 package com.valentin.orderservice.domain;
 
+import com.valentin.orderservice.domain.dictionary.OrderStatus;
 import com.valentin.orderservice.exception.InvalidOrderStatusTransitionException;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
