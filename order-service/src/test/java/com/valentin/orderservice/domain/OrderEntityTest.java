@@ -3,6 +3,7 @@ package com.valentin.orderservice.domain;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,7 +29,7 @@ public class OrderEntityTest {
                 1
         );
 
-        OrderEntity order = new OrderEntity();
+        OrderEntity order = createOrder();
         order.addItem(item1);
         order.addItem(item2);
 
@@ -41,7 +42,7 @@ public class OrderEntityTest {
 
     @Test
     public void recalculateTotalPrice_shouldSumAllItems() {
-        OrderEntity order = new OrderEntity();
+        OrderEntity order = createOrder();
 
         UUID productId = UUID.randomUUID();
 
@@ -63,16 +64,24 @@ public class OrderEntityTest {
         order.addItem(item2);
 
         assertThat(order.getOrderItems()).containsExactly(item1, item2);
-        assertThat(order.recalculateTotalPrice()).isEqualByComparingTo(new BigDecimal("400.00"));
+        assertThat(order.getTotalPrice()).isEqualByComparingTo(new BigDecimal("400.00"));
 
     }
 
     @Test
     public void recalculateTotalPrice_whenNoItems_shouldReturnZero() {
-        OrderEntity order = new OrderEntity();
+        OrderEntity order = createOrder();
 
-        assertThat(order.recalculateTotalPrice()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(order.getTotalPrice()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
+    private OrderEntity createOrder() {
+        return OrderEntity.createOrderEntity(
+                UUID.randomUUID(),
+                new ArrayList<>(),
+                OrderStatus.WAITING_FOR_INVENTORY,
+                "RUB"
+        );
+    }
 
 }

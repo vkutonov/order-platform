@@ -10,6 +10,7 @@ import com.valentin.orderservice.dto.OrderResponse;
 import com.valentin.orderservice.dto.OrderSummaryResponse;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -35,12 +36,11 @@ class OrderMapperTest {
                 userId,
                 new ArrayList<>(),
                 OrderStatus.WAITING_FOR_INVENTORY,
-                new BigDecimal("21.00"),
                 "RUB"
         );
-        order.setId(orderId);
-        order.setCreatedAt(createdAt);
-        order.setUpdatedAt(updatedAt);
+        ReflectionTestUtils.setField(order, "id", orderId);
+        ReflectionTestUtils.setField(order, "createdAt", createdAt);
+        ReflectionTestUtils.setField(order, "updatedAt", updatedAt);
 
         OrderItemEntity item = OrderItemEntity.create(
                 productId,
@@ -48,7 +48,7 @@ class OrderMapperTest {
                 new BigDecimal("10.50"),
                 2
         );
-        item.setId(itemId);
+        ReflectionTestUtils.setField(item, "id", itemId);
         order.addItem(item);
 
         OrderResponse response = mapper.toOrderResponse(order);
@@ -75,8 +75,13 @@ class OrderMapperTest {
         UUID historyId = UUID.randomUUID();
         Instant createdAt = Instant.parse("2026-06-29T10:15:30Z");
 
-        OrderEntity order = new OrderEntity();
-        order.setId(orderId);
+        OrderEntity order = OrderEntity.createOrderEntity(
+                UUID.randomUUID(),
+                new ArrayList<>(),
+                OrderStatus.WAITING_FOR_INVENTORY,
+                "RUB"
+        );
+        ReflectionTestUtils.setField(order, "id", orderId);
 
         OrderHistoryEntity history = OrderHistoryEntity.create(
                 order,
@@ -85,7 +90,7 @@ class OrderMapperTest {
                 OrderChangeHistoryReason.INVENTORY_RESERVED,
                 createdAt
         );
-        history.setId(historyId);
+        ReflectionTestUtils.setField(history, "id", historyId);
 
         OrderHistoryResponse response = mapper.toOrderHistoryResponse(history);
 
@@ -98,7 +103,7 @@ class OrderMapperTest {
     }
 
     @Test
-    void toOrderSummaryResponse_shouldMapOrderWithoutItems() {
+    void toOrderSummaryResponse_shouldMapOrder() {
         UUID orderId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         Instant createdAt = Instant.parse("2026-06-29T10:15:30Z");
@@ -108,12 +113,17 @@ class OrderMapperTest {
                 userId,
                 new ArrayList<>(),
                 OrderStatus.WAITING_FOR_PAYMENT,
-                new BigDecimal("46.00"),
                 "RUB"
         );
-        order.setId(orderId);
-        order.setCreatedAt(createdAt);
-        order.setUpdatedAt(updatedAt);
+        ReflectionTestUtils.setField(order, "id", orderId);
+        ReflectionTestUtils.setField(order, "createdAt", createdAt);
+        ReflectionTestUtils.setField(order, "updatedAt", updatedAt);
+        order.addItem(OrderItemEntity.create(
+                UUID.randomUUID(),
+                "Keyboard",
+                new BigDecimal("46.00"),
+                1
+        ));
 
         OrderSummaryResponse response = mapper.toOrderSummaryResponse(order);
 

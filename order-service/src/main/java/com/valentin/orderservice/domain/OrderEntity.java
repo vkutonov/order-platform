@@ -1,26 +1,30 @@
 package com.valentin.orderservice.domain;
 
+import com.valentin.orderservice.exception.InvalidOrderStatusTransitionException;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-
+import java.util.*;
 
 @Getter
-@Setter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "orders")
 public class OrderEntity {
+
+    private static final Map<OrderStatus, Set<OrderStatus>> ALLOWED_TRANSITIONS = Map.of(
+            OrderStatus.WAITING_FOR_INVENTORY, Set.of(OrderStatus.WAITING_FOR_PAYMENT, OrderStatus.CANCELLED),
+            OrderStatus.WAITING_FOR_PAYMENT, Set.of(OrderStatus.PAID, OrderStatus.PAYMENT_FAILED, OrderStatus.CANCELLED),
+            OrderStatus.PAYMENT_FAILED, Set.of(OrderStatus.WAITING_FOR_PAYMENT, OrderStatus.CANCELLED),
+            OrderStatus.PAID, Set.of(),
+            OrderStatus.CANCELLED, Set.of()
+    );
+
     @Id
     @UuidGenerator
     @GeneratedValue
@@ -53,40 +57,77 @@ public class OrderEntity {
     @Version
     private Long version;
 
-    public BigDecimal recalculateTotalPrice() {
-        BigDecimal totalPrice = BigDecimal.ZERO;
-
-        for (OrderItemEntity item : orderItems) {
-            totalPrice = totalPrice.add(item.getTotalPrice());
-        }
-
-        return totalPrice;
+    public void recalculateTotalPrice() {
+        this.totalPrice = orderItems.stream()
+                .map(OrderItemEntity::getTotalPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     public void addItem(OrderItemEntity item) {
         orderItems.add(item);
-        item.setOrder(this);
+        item.setReferenceToOrder(this);
+        recalculateTotalPrice();
     }
 
     public static OrderEntity createOrderEntity(
         UUID userId,
         List<OrderItemEntity> items,
         OrderStatus status,
-        BigDecimal totalPrice,
         String currency
     ) {
         OrderEntity order = new OrderEntity();
 
         Instant timeNow = Instant.now();
 
-        order.setUserId(userId);
-        order.setOrderItems(items);
-        order.setTotalPrice(totalPrice);
-        order.setStatus(status);
-        order.setCurrency(currency);
-        order.setCreatedAt(timeNow);
-        order.setUpdatedAt(timeNow);
+        order.userId = userId;
+        order.status = status;
+        order.currency = currency;
+        order.createdAt = timeNow;
+        order.updatedAt = timeNow;
+        order.totalPrice = BigDecimal.ZERO;
+        items.forEach(order::addItem);
 
         return order;
+    }
+
+    public void markInventoryReserved(Instant now) {
+        changeStatus(OrderStatus.WAITING_FOR_PAYMENT, now);
+    }
+
+    public void markInventoryReservationFailed(Instant now) {
+        changeStatus(OrderStatus.CANCELLED, now);
+    }
+
+    public void markPaymentSucceeded(Instant now) {
+        changeStatus(OrderStatus.PAID, now);
+    }
+
+    public void markPaymentFailed(Instant now) {
+        changeStatus(OrderStatus.PAYMENT_FAILED, now);
+    }
+
+    public void cancel(Instant now) {
+        changeStatus(OrderStatus.CANCELLED, now);
+    }
+
+
+    private void changeStatus(
+            OrderStatus status,
+            Instant timeNow
+    ) {
+
+        if (status == null) {
+            throw new IllegalArgumentException("New order status must not be null");
+        }
+
+        Set<OrderStatus> allowedStatuses = ALLOWED_TRANSITIONS.getOrDefault(this.status, Set.of());
+
+        if (!allowedStatuses.contains(status)) {
+            throw new InvalidOrderStatusTransitionException(this.id, this.status, status);
+        }
+
+        this.status = status;
+        this.updatedAt = timeNow;
+
     }
 }

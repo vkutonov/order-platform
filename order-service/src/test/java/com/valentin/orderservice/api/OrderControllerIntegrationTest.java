@@ -187,8 +187,10 @@ class OrderControllerIntegrationTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.error").value("Conflict"))
-                .andExpect(jsonPath("$.message").value("Order status mustn't be in WAITING_FOR_PAYMENT status"))
-                .andExpect(jsonPath("$.path").value("/api/orders/" + orderId + "/reserve"));
+                .andExpect(jsonPath("$.code").value("INVALID_ORDER_STATUS_TRANSITION"))
+                .andExpect(jsonPath("$.message").value("Order cannot be moved from WAITING_FOR_PAYMENT to WAITING_FOR_PAYMENT"))
+                .andExpect(jsonPath("$.path").value("/api/orders/" + orderId + "/reserve"))
+                .andExpect(jsonPath("$.fieldErrors", hasSize(0)));
     }
 
     @Test
@@ -206,7 +208,8 @@ class OrderControllerIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.error").value("Validation Failed"))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.message").value("Request validation failed"))
                 .andExpect(jsonPath("$.path").value("/api/orders"))
                 .andExpect(jsonPath("$.fieldErrors", hasSize(2)));

@@ -2,7 +2,7 @@ package com.valentin.orderservice.exception;
 
 import java.time.Instant;
 
-public record ErrorResponse(
+public record ServerErrorResponse(
         Instant timestamp,
         int status,
         String error,
