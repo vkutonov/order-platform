@@ -2,9 +2,11 @@ package com.valentin.orderservice.logic;
 
 import com.valentin.orderservice.db.OrderRepository;
 import com.valentin.orderservice.db.OrderHistoryRepository;
+import com.valentin.orderservice.db.OutboxEventRepository;
 import com.valentin.orderservice.domain.*;
 import com.valentin.orderservice.domain.dictionary.OrderChangeHistoryReason;
 import com.valentin.orderservice.domain.dictionary.OrderStatus;
+import com.valentin.orderservice.domain.event.OrderCreatedEvent;
 import com.valentin.orderservice.dto.*;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.mapper.OrderMapper;
@@ -12,11 +14,13 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -26,6 +30,8 @@ public class OrderService {
     private final OrderMapper mapper;
     private final OrderRepository orderRepository;
     private final OrderHistoryRepository orderHistoryRepository;
+    private final ObjectMapper objectMapper;
+    private final OutboxEventRepository outboxEventRepository;
 
 
     @Transactional
@@ -54,7 +60,7 @@ public class OrderService {
             order.addItem(orderItemEntity);
         }
 
-        orderRepository.save(order);
+        OrderEntity saved = orderRepository.save(order);
 
         log.info(
                 "Order created: orderId={}, status={}",
@@ -70,6 +76,32 @@ public class OrderService {
                 timeNow);
 
         orderHistoryRepository.save(orderStatusHistory);
+
+        OrderCreatedEvent orderCreatedEvent = OrderCreatedEvent.of(
+                saved.getId(),
+                Map.of("source", "order-service"),
+                timeNow
+        );
+
+
+        OutboxEventEntity outboxEvent = OutboxEventEntity.create(
+                "Order",
+                saved.getId(),
+                "OrderCreatedEvent",
+                objectMapper.writeValueAsString(orderCreatedEvent),
+                timeNow
+        );
+
+        outboxEventRepository.save(outboxEvent);
+
+        log.info(
+                "Outbox event created: eventId={}, aggregateType={}, aggregateId={}, eventType={}, status={}",
+                outboxEvent.getId(),
+                outboxEvent.getAggregateType(),
+                outboxEvent.getAggregateId(),
+                outboxEvent.getEventType(),
+                outboxEvent.getStatus()
+        );
 
         return mapper.toOrderResponse(order);
     }
