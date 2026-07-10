@@ -36,7 +36,8 @@ class OrderMapperTest {
                 userId,
                 new ArrayList<>(),
                 OrderStatus.WAITING_FOR_INVENTORY,
-                "RUB"
+                "RUB",
+                createdAt
         );
         ReflectionTestUtils.setField(order, "id", orderId);
         ReflectionTestUtils.setField(order, "createdAt", createdAt);
@@ -79,7 +80,8 @@ class OrderMapperTest {
                 UUID.randomUUID(),
                 new ArrayList<>(),
                 OrderStatus.WAITING_FOR_INVENTORY,
-                "RUB"
+                "RUB",
+                createdAt
         );
         ReflectionTestUtils.setField(order, "id", orderId);
 
@@ -113,7 +115,8 @@ class OrderMapperTest {
                 userId,
                 new ArrayList<>(),
                 OrderStatus.WAITING_FOR_PAYMENT,
-                "RUB"
+                "RUB",
+                createdAt
         );
         ReflectionTestUtils.setField(order, "id", orderId);
         ReflectionTestUtils.setField(order, "createdAt", createdAt);

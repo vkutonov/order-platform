@@ -12,13 +12,16 @@ public class OrderHistoryEntityTest {
 
     @Test
     public void create_shouldPopulateHistoryFields() {
+        Instant createdAt = Instant.parse("2026-06-29T10:15:30Z");
+
         OrderEntity order = OrderEntity.createOrderEntity(
                 UUID.randomUUID(),
                 new ArrayList<>(),
                 OrderStatus.WAITING_FOR_INVENTORY,
-                "RUB"
+                "RUB",
+                createdAt
         );
-        Instant createdAt = Instant.parse("2026-06-29T10:15:30Z");
+
 
         OrderHistoryEntity history = OrderHistoryEntity.create(
                 order,

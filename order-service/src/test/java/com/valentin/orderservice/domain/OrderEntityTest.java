@@ -144,7 +144,8 @@ public class OrderEntityTest {
                 UUID.randomUUID(),
                 new ArrayList<>(),
                 status,
-                "RUB"
+                "RUB",
+                Instant.now()
         );
     }
 

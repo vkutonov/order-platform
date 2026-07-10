@@ -15,6 +15,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -55,7 +56,8 @@ public class OrderServiceIntegrationTest {
                 userId,
                 new ArrayList<>(),
                 OrderStatus.WAITING_FOR_INVENTORY,
-                "RUB"
+                "RUB",
+                Instant.now()
         );
 
         orderRepository.save(order);

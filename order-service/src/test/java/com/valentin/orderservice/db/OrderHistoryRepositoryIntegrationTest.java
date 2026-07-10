@@ -50,22 +50,25 @@ public class OrderHistoryRepositoryIntegrationTest {
 
     @Test
     void findOrderHistoryByIdByCreatedTimeAsc() {
+        Instant createdAt = Instant.parse("2026-06-29T10:15:30Z");
 
         OrderEntity order1 = OrderEntity.createOrderEntity(
                 UUID.randomUUID(),
                 new ArrayList<>(),
                 OrderStatus.WAITING_FOR_INVENTORY,
-                "RUB"
+                "RUB",
+                createdAt
         );
 
         OrderEntity order2 = OrderEntity.createOrderEntity(
                 UUID.randomUUID(),
                 new ArrayList<>(),
                 OrderStatus.WAITING_FOR_INVENTORY,
-                "RUB"
+                "RUB",
+                createdAt
         );
 
-        Instant createdAt = Instant.parse("2026-06-29T10:15:30Z");
+
 
         OrderHistoryEntity history1 = OrderHistoryEntity.create(
                 order1,

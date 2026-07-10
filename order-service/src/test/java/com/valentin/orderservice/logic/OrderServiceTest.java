@@ -451,7 +451,8 @@ public class OrderServiceTest {
                 UUID.randomUUID(),
                 new ArrayList<>(),
                 status,
-                "RUB"
+                "RUB",
+                Instant.now()
         );
         ReflectionTestUtils.setField(order, "id", UUID.randomUUID());
 

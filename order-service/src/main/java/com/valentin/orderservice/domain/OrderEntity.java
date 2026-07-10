@@ -73,11 +73,10 @@ public class OrderEntity {
         UUID userId,
         List<OrderItemEntity> items,
         OrderStatus status,
-        String currency
+        String currency,
+        Instant timeNow
     ) {
         OrderEntity order = new OrderEntity();
-
-        Instant timeNow = Instant.now();
 
         order.userId = userId;
         order.status = status;
