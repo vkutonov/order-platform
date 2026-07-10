@@ -3,6 +3,8 @@ package com.valentin.orderservice.domain;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -10,7 +12,12 @@ public class OrderHistoryEntityTest {
 
     @Test
     public void create_shouldPopulateHistoryFields() {
-        OrderEntity order = new OrderEntity();
+        OrderEntity order = OrderEntity.createOrderEntity(
+                UUID.randomUUID(),
+                new ArrayList<>(),
+                OrderStatus.WAITING_FOR_INVENTORY,
+                "RUB"
+        );
         Instant createdAt = Instant.parse("2026-06-29T10:15:30Z");
 
         OrderHistoryEntity history = OrderHistoryEntity.create(

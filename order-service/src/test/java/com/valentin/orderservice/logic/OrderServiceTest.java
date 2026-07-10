@@ -5,9 +5,10 @@ import com.valentin.orderservice.db.OrderHistoryRepository;
 import com.valentin.orderservice.domain.OrderChangeHistoryReason;
 import com.valentin.orderservice.domain.OrderEntity;
 import com.valentin.orderservice.domain.OrderHistoryEntity;
+import com.valentin.orderservice.domain.OrderItemEntity;
 import com.valentin.orderservice.domain.OrderStatus;
 import com.valentin.orderservice.dto.*;
-import com.valentin.orderservice.exception.OrderInvalidStatusException;
+import com.valentin.orderservice.exception.InvalidOrderStatusTransitionException;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.mapper.OrderMapper;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -123,7 +125,7 @@ public class OrderServiceTest {
     void getOrderById_existingOrder_shouldReturnMappedResponse() {
         UUID orderId = UUID.randomUUID();
 
-        OrderEntity order = new OrderEntity();
+        OrderEntity order = orderWithStatus(OrderStatus.WAITING_FOR_INVENTORY);
         OrderResponse response = createOrderResponse();
 
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
@@ -157,13 +159,13 @@ public class OrderServiceTest {
         UUID userId = UUID.randomUUID();
         Instant timeNow = Instant.now();
 
-        OrderEntity entity = OrderEntity.createOrderEntity(
-                userId,
-                new ArrayList<>(),
-                OrderStatus.WAITING_FOR_INVENTORY,
+        OrderEntity entity = orderWithStatus(OrderStatus.WAITING_FOR_INVENTORY);
+        entity.addItem(OrderItemEntity.create(
+                UUID.randomUUID(),
+                "Desk",
                 new BigDecimal("100.00"),
-                "RUB"
-        );
+                1
+        ));
 
         OrderSummaryResponse response = new OrderSummaryResponse(
                 entity.getId(),
@@ -221,7 +223,13 @@ public class OrderServiceTest {
         UUID orderId = UUID.randomUUID();
 
         List<OrderHistoryResponse> response = createOrderHistoryResponse();
-        List<OrderHistoryEntity> history = List.of(new OrderHistoryEntity());
+        List<OrderHistoryEntity> history = List.of(OrderHistoryEntity.create(
+                orderWithStatus(OrderStatus.WAITING_FOR_INVENTORY),
+                null,
+                OrderStatus.WAITING_FOR_INVENTORY,
+                OrderChangeHistoryReason.ORDER_CREATED,
+                Instant.now()
+        ));
 
         when(orderRepository.existsById(orderId)).thenReturn(true);
         when(orderHistoryRepository.findOrderHistoryByIdByCreatedTimeAsc(orderId)).thenReturn(history);
@@ -327,7 +335,7 @@ public class OrderServiceTest {
         when(orderRepository.findById(order.getId()))
                 .thenReturn(Optional.of(order));
 
-        orderService.confirmPayment(order.getId());
+        orderService.markPaymentSucceeded(order.getId());
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(order.getUpdatedAt()).isAfterOrEqualTo(order.getCreatedAt());
@@ -342,7 +350,7 @@ public class OrderServiceTest {
         when(orderRepository.findById(order.getId()))
                 .thenReturn(Optional.of(order));
 
-        orderService.paymentFailed(order.getId());
+        orderService.markPaymentFailed(order.getId());
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED);
         assertThat(order.getUpdatedAt()).isAfterOrEqualTo(order.getCreatedAt());
@@ -372,8 +380,8 @@ public class OrderServiceTest {
         when(orderRepository.findById(order.getId()))
                 .thenReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> orderService.confirmPayment(order.getId()))
-                .isInstanceOf(OrderInvalidStatusException.class);
+        assertThatThrownBy(() -> orderService.markPaymentSucceeded(order.getId()))
+                .isInstanceOf(InvalidOrderStatusTransitionException.class);
 
         verify(orderRepository).findById(order.getId());
         verifyNoInteractions(orderHistoryRepository);
@@ -413,13 +421,15 @@ public class OrderServiceTest {
     }
 
     private OrderEntity orderWithStatus(OrderStatus status) {
-        return OrderEntity.createOrderEntity(
+        OrderEntity order = OrderEntity.createOrderEntity(
                 UUID.randomUUID(),
                 new ArrayList<>(),
                 status,
-                new BigDecimal("44.44"),
                 "RUB"
         );
+        ReflectionTestUtils.setField(order, "id", UUID.randomUUID());
+
+        return order;
     }
 
     private CreateOrderRequest createValidRequest() {

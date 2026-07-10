@@ -15,9 +15,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
-import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -57,7 +55,6 @@ public class OrderHistoryRepositoryIntegrationTest {
                 UUID.randomUUID(),
                 new ArrayList<>(),
                 OrderStatus.WAITING_FOR_INVENTORY,
-                new BigDecimal("100.00"),
                 "RUB"
         );
 
@@ -65,7 +62,6 @@ public class OrderHistoryRepositoryIntegrationTest {
                 UUID.randomUUID(),
                 new ArrayList<>(),
                 OrderStatus.WAITING_FOR_INVENTORY,
-                new BigDecimal("150.00"),
                 "RUB"
         );
 
