@@ -1,7 +1,6 @@
 package com.valentin.orderservice.dto;
 
-import com.valentin.orderservice.domain.OrderStatus;
-import jakarta.validation.constraints.FutureOrPresent;
+import com.valentin.orderservice.domain.dictionary.OrderStatus;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.Instant;

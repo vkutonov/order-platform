@@ -1,4 +1,4 @@
-package com.valentin.orderservice.domain;
+package com.valentin.orderservice.domain.dictionary;
 
 public enum OrderChangeHistoryReason {
     ORDER_CREATED,

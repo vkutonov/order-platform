@@ -1,6 +1,6 @@
 package com.valentin.orderservice.exception;
 
-import com.valentin.orderservice.domain.OrderStatus;
+import com.valentin.orderservice.domain.dictionary.OrderStatus;
 import lombok.Getter;
 
 import java.util.UUID;

@@ -3,6 +3,8 @@ package com.valentin.orderservice.logic;
 import com.valentin.orderservice.db.OrderRepository;
 import com.valentin.orderservice.db.OrderHistoryRepository;
 import com.valentin.orderservice.domain.*;
+import com.valentin.orderservice.domain.dictionary.OrderChangeHistoryReason;
+import com.valentin.orderservice.domain.dictionary.OrderStatus;
 import com.valentin.orderservice.dto.*;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.mapper.OrderMapper;

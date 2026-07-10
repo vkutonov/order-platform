@@ -1,6 +1,8 @@
 package com.valentin.orderservice.domain;
 
 
+import com.valentin.orderservice.domain.dictionary.OrderChangeHistoryReason;
+import com.valentin.orderservice.domain.dictionary.OrderStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

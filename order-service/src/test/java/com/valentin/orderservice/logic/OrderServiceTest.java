@@ -2,11 +2,11 @@ package com.valentin.orderservice.logic;
 
 import com.valentin.orderservice.db.OrderRepository;
 import com.valentin.orderservice.db.OrderHistoryRepository;
-import com.valentin.orderservice.domain.OrderChangeHistoryReason;
+import com.valentin.orderservice.domain.dictionary.OrderChangeHistoryReason;
 import com.valentin.orderservice.domain.OrderEntity;
 import com.valentin.orderservice.domain.OrderHistoryEntity;
 import com.valentin.orderservice.domain.OrderItemEntity;
-import com.valentin.orderservice.domain.OrderStatus;
+import com.valentin.orderservice.domain.dictionary.OrderStatus;
 import com.valentin.orderservice.dto.*;
 import com.valentin.orderservice.exception.InvalidOrderStatusTransitionException;
 import com.valentin.orderservice.exception.OrderNotFoundException;

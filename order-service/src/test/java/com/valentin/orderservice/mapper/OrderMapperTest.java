@@ -1,10 +1,10 @@
 package com.valentin.orderservice.mapper;
 
-import com.valentin.orderservice.domain.OrderChangeHistoryReason;
+import com.valentin.orderservice.domain.dictionary.OrderChangeHistoryReason;
 import com.valentin.orderservice.domain.OrderEntity;
 import com.valentin.orderservice.domain.OrderHistoryEntity;
 import com.valentin.orderservice.domain.OrderItemEntity;
-import com.valentin.orderservice.domain.OrderStatus;
+import com.valentin.orderservice.domain.dictionary.OrderStatus;
 import com.valentin.orderservice.dto.OrderHistoryResponse;
 import com.valentin.orderservice.dto.OrderResponse;
 import com.valentin.orderservice.dto.OrderSummaryResponse;

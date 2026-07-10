@@ -1,9 +1,9 @@
 package com.valentin.orderservice.db;
 
-import com.valentin.orderservice.domain.OrderChangeHistoryReason;
+import com.valentin.orderservice.domain.dictionary.OrderChangeHistoryReason;
 import com.valentin.orderservice.domain.OrderEntity;
 import com.valentin.orderservice.domain.OrderHistoryEntity;
-import com.valentin.orderservice.domain.OrderStatus;
+import com.valentin.orderservice.domain.dictionary.OrderStatus;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

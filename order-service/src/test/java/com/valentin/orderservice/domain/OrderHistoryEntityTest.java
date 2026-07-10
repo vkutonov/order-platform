@@ -1,5 +1,7 @@
 package com.valentin.orderservice.domain;
 
+import com.valentin.orderservice.domain.dictionary.OrderChangeHistoryReason;
+import com.valentin.orderservice.domain.dictionary.OrderStatus;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
