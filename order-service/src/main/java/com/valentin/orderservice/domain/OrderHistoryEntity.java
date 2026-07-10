@@ -4,7 +4,6 @@ package com.valentin.orderservice.domain;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.Instant;
@@ -12,7 +11,6 @@ import java.util.UUID;
 
 
 @Getter
-@Setter
 @NoArgsConstructor
 @Entity
 @Table(name = "order_status_history")
@@ -50,11 +48,11 @@ public class OrderHistoryEntity {
             Instant time
     ) {
         OrderHistoryEntity orderHistoryEntity = new OrderHistoryEntity();
-        orderHistoryEntity.setCreatedAt(time);
-        orderHistoryEntity.setOrder(order);
-        orderHistoryEntity.setOldStatus(oldStatus);
-        orderHistoryEntity.setNewStatus(newStatus);
-        orderHistoryEntity.setReason(reason);
+        orderHistoryEntity.createdAt = time;
+        orderHistoryEntity.order = order;
+        orderHistoryEntity.oldStatus = oldStatus;
+        orderHistoryEntity.newStatus = newStatus;
+        orderHistoryEntity.reason = reason;
 
         return orderHistoryEntity;
     }

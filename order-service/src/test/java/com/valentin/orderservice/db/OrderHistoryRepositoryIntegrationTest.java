@@ -15,9 +15,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
-import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -52,14 +50,12 @@ public class OrderHistoryRepositoryIntegrationTest {
 
     @Test
     void findOrderHistoryByIdByCreatedTimeAsc() {
-
         Instant createdAt = Instant.parse("2026-06-29T10:15:30Z");
 
         OrderEntity order1 = OrderEntity.createOrderEntity(
                 UUID.randomUUID(),
                 new ArrayList<>(),
                 OrderStatus.WAITING_FOR_INVENTORY,
-                new BigDecimal("100.00"),
                 "RUB",
                 createdAt
         );
@@ -68,10 +64,10 @@ public class OrderHistoryRepositoryIntegrationTest {
                 UUID.randomUUID(),
                 new ArrayList<>(),
                 OrderStatus.WAITING_FOR_INVENTORY,
-                new BigDecimal("150.00"),
                 "RUB",
                 createdAt
         );
+
 
 
         OrderHistoryEntity history1 = OrderHistoryEntity.create(

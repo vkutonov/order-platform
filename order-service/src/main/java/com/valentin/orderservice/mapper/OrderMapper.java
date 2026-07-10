@@ -17,6 +17,10 @@ public interface OrderMapper {
 
     OrderItemResponse toOrderItemResponse(OrderItemEntity entity);
 
+    OrderSummaryResponse toOrderSummaryResponse(OrderEntity entity);
+
+    List<OrderSummaryResponse> toOrderSummaryResponses(List<OrderEntity> entities);
+
     @Mapping(target = "orderId", source = "order.id")
     OrderHistoryResponse toOrderHistoryResponse(OrderHistoryEntity entity);
 
