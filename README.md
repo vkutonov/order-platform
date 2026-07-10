@@ -1,3 +1,5 @@
+![CI](https://github.com/vkutonov/order-platform/actions/workflows/ci.yml/badge.svg)
+
 # Order Platform
 
 [![CI](https://github.com/vkutonov/order-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/vkutonov/order-platform/actions/workflows/ci.yml)

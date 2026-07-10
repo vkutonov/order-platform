@@ -29,7 +29,7 @@ public class OrderService {
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest orderRequest) {
 
-        Instant instantNow = Instant.now();
+        Instant timeNow = Instant.now();
 
         OrderEntity order = OrderEntity.createOrderEntity(
                 orderRequest.userId(),
@@ -64,7 +64,8 @@ public class OrderService {
                 null,
                 OrderStatus.WAITING_FOR_INVENTORY,
                 OrderChangeHistoryReason.ORDER_CREATED,
-                instantNow);
+                timeNow
+        );
 
         orderHistoryRepository.save(orderStatusHistory);
 
