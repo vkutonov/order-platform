@@ -2,10 +2,12 @@ package com.valentin.orderservice.db;
 
 import com.valentin.orderservice.domain.OutboxEventEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,4 +32,16 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEventEntity, 
             RETURNING *
             """, nativeQuery = true)
     List<OutboxEventEntity> claimNewEvents(@Param("limit") int limit);
+
+    @Modifying
+    @Query(value = """
+        UPDATE outbox_events
+        SET status = 'NEW',
+            processed_at = NULL,
+            error_message = 'Released stuck PROCESSING event'
+        WHERE status = 'PROCESSING'
+          AND processed_at < :threshold
+        """, nativeQuery = true)
+    int releaseStuckProcessingEvents(@Param("threshold") Instant threshold);
+
 }
