@@ -28,6 +28,31 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+  kafka:
+
+    bootstrap-servers: localhost:${KAFKA_EXTERNAL_PORT}
+    producer:
+      client-id: order-service-outbox-producer
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        "[enable.idempotence]": true
+
+
+
+app:
+  kafka:
+    topics:
+      order-events: order.events
+
+  outbox:
+    polling:
+      batch-size: 50
+      fixed-delay-ms: 5000
+      processing-timeout-ms: 60000
+
+
 logging:
   level:
     org.hibernate.SQL: debug
+    org.apache.kafka: INFO
