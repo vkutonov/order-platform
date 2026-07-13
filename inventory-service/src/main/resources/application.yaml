@@ -1,0 +1,33 @@
+server:
+  port: ${INVENTORY_SERVICE_PORT}
+
+spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+
+  application:
+    name: inventory-service
+
+  datasource:
+    url: jdbc:postgresql://${INVENTORY_DB_HOST}:${INVENTORY_DB_PORT}/${INVENTORY_DB_NAME}
+    username: ${INVENTORY_DB_USERNAME}
+    password: ${INVENTORY_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+logging:
+  level:
+    org.hibernate.SQL: debug
