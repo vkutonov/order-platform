@@ -6,8 +6,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+
+import static java.lang.Thread.currentThread;
 
 
 @Service
@@ -21,7 +24,18 @@ public class OutboxEventPoller {
     @Value("${app.outbox.polling.batch-size}")
     private int batchSize;
 
+    @Value("${app.outbox.polling.processing-timeout-ms}")
+    private long processingTimeout;
+
+
+    private final Clock clock;
+
     public void pollAndPublish() {
+
+        Instant threshold = clock.instant().minusMillis(processingTimeout);
+
+        outboxEventService.releaseStuckProcessingEvents(threshold);
+
         List<OutboxEventEntity> events = outboxEventService.claimNewEvents(batchSize);
 
         if (events.isEmpty()) {
@@ -31,16 +45,22 @@ public class OutboxEventPoller {
 
         log.info("Claimed outbox events for publishing: count={}", events.size());
 
+
         for (OutboxEventEntity event : events) {
+            if (currentThread().isInterrupted()) {
+                break;
+            }
+
             publishEvent(event);
         }
+
     }
 
     private void publishEvent(OutboxEventEntity event) {
         try {
             outboxKafkaPublisher.publish(event);
 
-            outboxEventService.markPublished(event.getId(), Instant.now());
+            outboxEventService.markPublished(event.getId(), clock.instant());
 
             log.info(
                     "Outbox event published: eventId={}, aggregateId={}, eventType={}",
@@ -49,7 +69,7 @@ public class OutboxEventPoller {
                     event.getEventType()
             );
         } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
+            currentThread().interrupt();
 
             outboxEventService.markNewAfterFailure(
                     event.getId(),
