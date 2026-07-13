@@ -15,6 +15,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -46,6 +47,9 @@ public class OrderServiceIntegrationTest {
     @Autowired
     private OrderHistoryRepository historyRepository;
 
+    @Autowired
+    private Clock clock;
+
 
     @Test
     void reserveInventory_shouldUpdateOrderAndSaveHistory() {
@@ -57,7 +61,7 @@ public class OrderServiceIntegrationTest {
                 new ArrayList<>(),
                 OrderStatus.WAITING_FOR_INVENTORY,
                 "RUB",
-                Instant.now()
+                clock.instant()
         );
 
         orderRepository.save(order);

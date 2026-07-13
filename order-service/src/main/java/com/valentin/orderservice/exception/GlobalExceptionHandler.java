@@ -1,6 +1,7 @@
 package com.valentin.orderservice.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,12 +12,15 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.util.List;
 
 @Slf4j
 @RestControllerAdvice
+@RequiredArgsConstructor
 public class GlobalExceptionHandler {
+
+    private final Clock clock;
 
     @ExceptionHandler(OrderNotFoundException.class)
     public ResponseEntity<ClientErrorResponse> handleOrderNotFound(
@@ -206,7 +210,7 @@ public class GlobalExceptionHandler {
         HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
 
         ServerErrorResponse response = new ServerErrorResponse(
-                Instant.now(),
+                clock.instant(),
                 status.value(),
                 status.getReasonPhrase(),
                 "Internal server error",
@@ -226,7 +230,7 @@ public class GlobalExceptionHandler {
             List<FieldErrorResponse> fieldErrors
     ) {
         return new ClientErrorResponse(
-                Instant.now(),
+                clock.instant(),
                 status.value(),
                 status.getReasonPhrase(),
                 code,
