@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,12 +33,13 @@ public class OrderService {
     private final OrderHistoryRepository orderHistoryRepository;
     private final ObjectMapper objectMapper;
     private final OutboxEventRepository outboxEventRepository;
+    private final Clock clock;
 
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest orderRequest) {
 
-        Instant timeNow = Instant.now();
+        Instant timeNow = clock.instant();
 
         OrderEntity order = OrderEntity.createOrderEntity(
                 orderRequest.userId(),
@@ -109,7 +111,7 @@ public class OrderService {
     @Transactional
     public void reserveInventory(UUID orderId) {
         OrderEntity order = findOrder(orderId);
-        Instant timeNow = Instant.now();
+        Instant timeNow = clock.instant();
 
         OrderStatus oldStatus = order.getStatus();
 
@@ -135,7 +137,7 @@ public class OrderService {
     @Transactional
     public void inventoryReservationFailed(UUID orderId) {
         OrderEntity order = findOrder(orderId);
-        Instant timeNow = Instant.now();
+        Instant timeNow = clock.instant();
 
         OrderStatus oldStatus = order.getStatus();
 
@@ -164,7 +166,7 @@ public class OrderService {
         OrderEntity order = findOrder(orderId);
 
         OrderStatus oldStatus = order.getStatus();
-        Instant timeNow = Instant.now();
+        Instant timeNow = clock.instant();
 
         order.markPaymentSucceeded(timeNow);
 
@@ -189,7 +191,7 @@ public class OrderService {
         OrderEntity order = findOrder(orderId);
 
         OrderStatus oldStatus = order.getStatus();
-        Instant timeNow = Instant.now();
+        Instant timeNow = clock.instant();
 
         order.markPaymentFailed(timeNow);
 
@@ -214,7 +216,7 @@ public class OrderService {
         OrderEntity order = findOrder(orderId);
 
         OrderStatus oldStatus = order.getStatus();
-        Instant timeNow = Instant.now();
+        Instant timeNow = clock.instant();
 
         order.cancel(timeNow);
 

@@ -103,6 +103,52 @@ class OutboxEventRepositoryIntegrationTest {
                 .isEqualTo(OutboxEventStatus.PUBLISHED);
     }
 
+    @Test
+    void releaseStuckProcessingEvents_shouldReleaseOnlyProcessingEventsOlderThanThreshold() {
+        Instant threshold = Instant.parse("2026-07-12T10:15:30Z");
+
+        OutboxEventEntity oldProcessingEvent = createEvent(UUID.randomUUID(), threshold.minusSeconds(120));
+        OutboxEventEntity freshProcessingEvent = createEvent(UUID.randomUUID(), threshold.minusSeconds(30));
+        OutboxEventEntity newEvent = createEvent(UUID.randomUUID(), threshold.minusSeconds(60));
+        outboxEventRepository.saveAll(List.of(oldProcessingEvent, freshProcessingEvent, newEvent));
+
+        entityManager.flush();
+        setProcessing(oldProcessingEvent.getId(), threshold.minusSeconds(1));
+        setProcessing(freshProcessingEvent.getId(), threshold.plusSeconds(1));
+        entityManager.flush();
+        entityManager.clear();
+
+        int released = outboxEventRepository.releaseStuckProcessingEvents(threshold);
+
+        assertThat(released).isEqualTo(1);
+
+        entityManager.clear();
+
+        OutboxEventEntity releasedEvent = outboxEventRepository.findById(oldProcessingEvent.getId()).orElseThrow();
+        assertThat(releasedEvent.getStatus()).isEqualTo(OutboxEventStatus.NEW);
+        assertThat(releasedEvent.getProcessedAt()).isNull();
+        assertThat(releasedEvent.getErrorMessage()).isEqualTo("Released stuck PROCESSING event");
+
+        OutboxEventEntity stillProcessingEvent = outboxEventRepository.findById(freshProcessingEvent.getId()).orElseThrow();
+        assertThat(stillProcessingEvent.getStatus()).isEqualTo(OutboxEventStatus.PROCESSING);
+        assertThat(stillProcessingEvent.getProcessedAt()).isEqualTo(threshold.plusSeconds(1));
+
+        OutboxEventEntity unchangedNewEvent = outboxEventRepository.findById(newEvent.getId()).orElseThrow();
+        assertThat(unchangedNewEvent.getStatus()).isEqualTo(OutboxEventStatus.NEW);
+        assertThat(unchangedNewEvent.getProcessedAt()).isNull();
+    }
+
+    private void setProcessing(UUID eventId, Instant processedAt) {
+        entityManager.createNativeQuery("""
+                UPDATE outbox_events
+                SET status = 'PROCESSING', processed_at = :processedAt
+                WHERE id = :eventId
+                """)
+                .setParameter("eventId", eventId)
+                .setParameter("processedAt", processedAt)
+                .executeUpdate();
+    }
+
     private OutboxEventEntity createEvent(UUID aggregateId, Instant createdAt) {
         String payload = """
                 {

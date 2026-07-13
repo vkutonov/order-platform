@@ -15,18 +15,20 @@ import com.valentin.orderservice.dto.*;
 import com.valentin.orderservice.exception.InvalidOrderStatusTransitionException;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.mapper.OrderMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.*;
@@ -35,6 +37,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class OrderServiceTest {
+
+    private static final Instant NOW = Instant.parse("2026-07-13T12:00:00Z");
 
     @Mock
     private OrderRepository orderRepository;
@@ -51,8 +55,9 @@ public class OrderServiceTest {
     @Mock
     private ObjectMapper objectMapper;
 
-    @InjectMocks
     private OrderService orderService;
+
+    private Clock clock;
 
     @Captor
     private ArgumentCaptor<OrderEntity> orderCaptor;
@@ -65,6 +70,19 @@ public class OrderServiceTest {
 
     @Captor
     private ArgumentCaptor<OrderCreatedEvent> orderCreatedEventCaptor;
+
+    @BeforeEach
+    void setUp() {
+        clock = Clock.fixed(NOW, ZoneOffset.UTC);
+        orderService = new OrderService(
+                orderMapper,
+                orderRepository,
+                orderHistoryRepository,
+                objectMapper,
+                outboxEventRepository,
+                clock
+        );
+    }
 
     @Test
     void createOrder_shouldCreateOrderWithCreatedStatus() {
@@ -138,7 +156,7 @@ public class OrderServiceTest {
     @Test
     void createOrder_shouldCreateOutboxEvent(){
 
-        Instant timeNow = Instant.now();
+        Instant timeNow = NOW;
 
         CreateOrderRequest request = createValidRequestWithMultipleItems();
 
@@ -227,7 +245,7 @@ public class OrderServiceTest {
     @Test
     void getOrdersByUserId_existingOrders_shouldReturnMappedResponses() {
         UUID userId = UUID.randomUUID();
-        Instant timeNow = Instant.now();
+        Instant timeNow = NOW;
 
         OrderEntity entity = orderWithStatus(OrderStatus.WAITING_FOR_INVENTORY);
         entity.addItem(OrderItemEntity.create(
@@ -298,7 +316,7 @@ public class OrderServiceTest {
                 null,
                 OrderStatus.WAITING_FOR_INVENTORY,
                 OrderChangeHistoryReason.ORDER_CREATED,
-                Instant.now()
+                NOW
         ));
 
         when(orderRepository.existsById(orderId)).thenReturn(true);
@@ -335,7 +353,7 @@ public class OrderServiceTest {
                 null,
                 OrderStatus.WAITING_FOR_INVENTORY,
                 "test reason",
-                Instant.now()
+                NOW
         );
 
         OrderHistoryResponse historyItem2 = new OrderHistoryResponse(
@@ -344,7 +362,7 @@ public class OrderServiceTest {
                 OrderStatus.WAITING_FOR_INVENTORY,
                 OrderStatus.WAITING_FOR_PAYMENT,
                 "test reason2",
-                Instant.now()
+                NOW
         );
 
         OrderHistoryResponse historyItem3 = new OrderHistoryResponse(
@@ -353,7 +371,7 @@ public class OrderServiceTest {
                 OrderStatus.WAITING_FOR_PAYMENT,
                 OrderStatus.PAYMENT_FAILED,
                 "test reason3",
-                Instant.now()
+                NOW
         );
 
         return List.of(historyItem1, historyItem2, historyItem3);
@@ -377,8 +395,8 @@ public class OrderServiceTest {
                 item.totalPrice(),
                 "RUB",
                 List.of(item),
-                Instant.now(),
-                Instant.now()
+                NOW,
+                NOW
         );
     }
 
@@ -522,7 +540,7 @@ public class OrderServiceTest {
                 new ArrayList<>(),
                 status,
                 "RUB",
-                Instant.now()
+                NOW
         );
         ReflectionTestUtils.setField(order, "id", UUID.randomUUID());
 

@@ -14,6 +14,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class OrderEntityTest {
 
+    private static final Instant TEST_TIME = Instant.parse("2026-07-13T12:00:00Z");
+
     @Test
     public void addItem_shouldAddItemsAndSetBackReferences() {
 
@@ -83,7 +85,7 @@ public class OrderEntityTest {
     void markInventoryReserved_fromWaitingForInventory_shouldChangeStatusToWaitingForPayment() {
         OrderEntity order = createOrder(OrderStatus.WAITING_FOR_INVENTORY);
 
-        order.markInventoryReserved(Instant.now());
+        order.markInventoryReserved(TEST_TIME);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.WAITING_FOR_PAYMENT);
         assertThat(order.getUpdatedAt()).isAfterOrEqualTo(order.getCreatedAt());
@@ -93,7 +95,7 @@ public class OrderEntityTest {
     void markPaymentSucceeded_fromWaitingForPayment_shouldChangeStatusToPaid() {
         OrderEntity order = createOrder(OrderStatus.WAITING_FOR_PAYMENT);
 
-        order.markPaymentSucceeded(Instant.now());
+        order.markPaymentSucceeded(TEST_TIME);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(order.getUpdatedAt()).isAfterOrEqualTo(order.getCreatedAt());
@@ -103,7 +105,7 @@ public class OrderEntityTest {
     void markPaymentFailed_fromWaitingForPayment_shouldChangeStatusToPaymentFailed() {
         OrderEntity order = createOrder(OrderStatus.WAITING_FOR_PAYMENT);
 
-        order.markPaymentFailed(Instant.now());
+        order.markPaymentFailed(TEST_TIME);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED);
         assertThat(order.getUpdatedAt()).isAfterOrEqualTo(order.getCreatedAt());
@@ -113,7 +115,7 @@ public class OrderEntityTest {
     void cancel_fromCreated_shouldChangeStatusToCancelled() {
         OrderEntity order = createOrder(OrderStatus.WAITING_FOR_INVENTORY);
 
-        order.cancel(Instant.now());
+        order.cancel(TEST_TIME);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
         assertThat(order.getUpdatedAt()).isAfterOrEqualTo(order.getCreatedAt());
@@ -123,7 +125,7 @@ public class OrderEntityTest {
     void markPaymentSucceeded_fromCreated_shouldThrowException() {
         OrderEntity order = createOrder(OrderStatus.WAITING_FOR_INVENTORY);
 
-        assertThatThrownBy(() -> order.markPaymentSucceeded(Instant.now()))
+        assertThatThrownBy(() -> order.markPaymentSucceeded(TEST_TIME))
                 .isInstanceOf(InvalidOrderStatusTransitionException.class);
     }
 
@@ -131,7 +133,7 @@ public class OrderEntityTest {
     void cancel_fromPaid_shouldThrowException() {
         OrderEntity order = createOrder(OrderStatus.PAID);
 
-        assertThatThrownBy(() -> order.cancel(Instant.now()))
+        assertThatThrownBy(() -> order.cancel(TEST_TIME))
                 .isInstanceOf(InvalidOrderStatusTransitionException.class);
     }
 
@@ -145,7 +147,7 @@ public class OrderEntityTest {
                 new ArrayList<>(),
                 status,
                 "RUB",
-                Instant.now()
+                TEST_TIME
         );
     }
 
