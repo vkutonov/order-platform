@@ -31,6 +31,8 @@ docker-data/
 !**/src/main/**/build/
 !**/src/test/**/build/
 .kotlin
+.agents
+amplicode.xml
 
 ### IntelliJ IDEA ###
 .idea/modules.xml
