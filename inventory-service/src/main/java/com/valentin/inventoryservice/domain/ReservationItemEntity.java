@@ -49,7 +49,7 @@ public class ReservationItemEntity {
         }
 
         if (productId == null) {
-            throw new IllegalArgumentException("Product id mustn't be null");
+            throw new IllegalArgumentException("Product productId mustn't be null");
         }
 
         if (quantity <= 0) {
