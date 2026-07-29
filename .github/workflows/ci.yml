@@ -25,7 +25,7 @@ jobs:
       matrix:
         service:
           - order-service
-          # - inventory-service
+          - inventory-service
           # - payment-service
           # - notification-service
           # - api-gateway
