@@ -14,6 +14,8 @@ import com.valentin.inventoryservice.dto.CreateReservationCommand;
 import com.valentin.inventoryservice.dto.ReservationItemCommand;
 import com.valentin.inventoryservice.dto.ReservationResult;
 import com.valentin.inventoryservice.exception.ProductNotFoundException;
+import com.valentin.inventoryservice.exception.ReservationCommandConflictException;
+import com.valentin.inventoryservice.exception.ReservationNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -43,7 +46,9 @@ public class ReservationService {
         );
 
         if (existing.isPresent()) {
-            return toResult(existing.get());
+            ReservationEntity reservation = existing.get();
+            validateExistingReservation(reservation, command);
+            return toResult(reservation);
         }
 
         Instant now = clock.instant();
@@ -62,7 +67,7 @@ public class ReservationService {
                 now
         );
 
-        for (ReservationItemCommand item: command.items()) {
+        for (ReservationItemCommand item : command.items()) {
             reservation.addItem(
                     item.productId(),
                     item.quantity()
@@ -91,6 +96,14 @@ public class ReservationService {
             );
 
             ReservationEntity saved = reservationRepository.save(reservation);
+
+            log.info(
+                    "Reservation rejected: reservationId={}, orderId={}, status={}, failureCode={}",
+                    saved.getId(),
+                    saved.getOrderId(),
+                    saved.getStatus(),
+                    failureCode
+            );
 
             return ReservationResult.failed(
                     saved.getId(),
@@ -148,6 +161,28 @@ public class ReservationService {
         return productsById;
     }
 
+    private void validateExistingReservation(
+            ReservationEntity reservation,
+            CreateReservationCommand command
+    ) {
+        Map<UUID, Integer> existingItems = reservation.getItems().stream()
+                .collect(Collectors.toMap(
+                        ReservationItemEntity::getProductId,
+                        ReservationItemEntity::getQuantity
+                ));
+
+        Map<UUID, Integer> requestedItems = command.items().stream()
+                .collect(Collectors.toMap(
+                        ReservationItemCommand::productId,
+                        ReservationItemCommand::quantity
+                ));
+
+        if (!Objects.equals(reservation.getUserId(), command.userId())
+                || !existingItems.equals(requestedItems)) {
+            throw new ReservationCommandConflictException(command.orderId());
+        }
+    }
+
     private Map<UUID, InventoryItemEntity> loadInventoryItems(Set<UUID> productIds) {
         Map<UUID, InventoryItemEntity> inventoryByProductIds =
                 inventoryItemRepository.findAllByProductIdIn(productIds)
@@ -177,7 +212,7 @@ public class ReservationService {
             ProductEntity product = products.get(requestedItem.productId());
 
             if (product.getStatus() != ProductStatus.ACTIVE) {
-                log.warn(
+                log.debug(
                         "Product is not active: productId={}, status={}",
                         product.getId(),
                         product.getStatus()
@@ -201,7 +236,7 @@ public class ReservationService {
             int available = item.getAvailableQuantity();
 
             if (available < requestedItem.quantity()) {
-                log.warn(
+                log.debug(
                         "Insufficient stock: productId={}, requested={}, available={}",
                         requestedItem.productId(),
                         requestedItem.quantity(),
@@ -231,17 +266,101 @@ public class ReservationService {
 
     @Transactional
     public void commit(UUID orderId) {
-        // подтверждает резерв всего заказа
+        processReservation(
+                orderId,
+                ReservationEntity::commit,
+                InventoryItemEntity::commitReservation,
+                ReservationStatus.COMMITTED
+        );
     }
 
     @Transactional
     public void release(UUID orderId) {
-        // освобождает резерв всего заказа
+        processReservation(
+                orderId,
+                ReservationEntity::release,
+                InventoryItemEntity::release,
+                ReservationStatus.RELEASED
+        );
     }
 
     @Transactional
     public void expire(UUID orderId) {
-        // освобождает истёкший резерв
+        processReservation(
+                orderId,
+                ReservationEntity::expire,
+                InventoryItemEntity::release,
+                ReservationStatus.EXPIRED
+        );
+    }
+
+    private void processReservation(
+            UUID orderId,
+            BiConsumer<ReservationEntity, Instant> reservationOperation,
+            InventoryOperation inventoryOperation,
+            ReservationStatus targetStatus
+    ) {
+        Instant now = clock.instant();
+        ReservationEntity reservation = findReservation(orderId);
+
+        log.debug(
+                "Processing reservation lifecycle operation: reservationId={}, orderId={}, currentStatus={}, targetStatus={}",
+                reservation.getId(),
+                reservation.getOrderId(),
+                reservation.getStatus(),
+                targetStatus
+        );
+
+        if (reservation.getStatus() == targetStatus) {
+            log.debug(
+                    "Reservation lifecycle operation skipped: reservationId={}, orderId={}, status={}, reason=already_completed",
+                    reservation.getId(),
+                    reservation.getOrderId(),
+                    reservation.getStatus()
+            );
+            return;
+        }
+
+        reservationOperation.accept(reservation, now);
+
+        Set<UUID> productIds = reservation.getItems().stream()
+                .map(ReservationItemEntity::getProductId)
+                .collect(Collectors.toSet());
+
+        Map<UUID, InventoryItemEntity> inventoryItems = loadInventoryItems(productIds);
+
+        for (ReservationItemEntity reservationItem : reservation.getItems()) {
+            InventoryItemEntity inventoryItem =
+                    inventoryItems.get(reservationItem.getProductId());
+
+            inventoryOperation.apply(
+                    inventoryItem,
+                    reservationItem.getQuantity(),
+                    now
+            );
+        }
+
+        log.info(
+                "Reservation lifecycle operation completed: reservationId={}, orderId={}, status={}",
+                reservation.getId(),
+                reservation.getOrderId(),
+                reservation.getStatus()
+        );
+    }
+
+    private ReservationEntity findReservation(UUID orderId) {
+        return reservationRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new ReservationNotFoundException(orderId));
+    }
+
+    @FunctionalInterface
+    private interface InventoryOperation {
+
+        void apply(
+                InventoryItemEntity inventoryItem,
+                int quantity,
+                Instant now
+        );
     }
 
 }

@@ -4,6 +4,9 @@ import org.springframework.http.HttpStatus;
 
 public enum ApiErrorCode {
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND),
+    RESERVATION_NOT_FOUND(HttpStatus.NOT_FOUND),
+    RESERVATION_NOT_EXPIRED(HttpStatus.CONFLICT),
+    RESERVATION_COMMAND_CONFLICT(HttpStatus.CONFLICT),
     INSUFFICIENT_STOCK(HttpStatus.CONFLICT),
     INVALID_TRANSITION(HttpStatus.CONFLICT),
     DUPLICATE_RESERVATION_PRODUCT(HttpStatus.CONFLICT),

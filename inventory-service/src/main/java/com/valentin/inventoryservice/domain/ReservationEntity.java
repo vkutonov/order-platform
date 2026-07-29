@@ -5,6 +5,7 @@ import com.valentin.inventoryservice.domain.dictionary.ReservationStatus;
 import com.valentin.inventoryservice.exception.ApiErrorCode;
 import com.valentin.inventoryservice.exception.DuplicateReservationProductException;
 import com.valentin.inventoryservice.exception.InvalidReservationStatusException;
+import com.valentin.inventoryservice.exception.ReservationNotExpiredException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -159,13 +160,28 @@ public class ReservationEntity {
     }
 
     public void expire(Instant now) {
-        transitionTo(ReservationStatus.EXPIRED, now);
+        validateTransition(ReservationStatus.EXPIRED);
+
+        if (expiresAt == null || now.isBefore(expiresAt)) {
+            throw new ReservationNotExpiredException(
+                    orderId,
+                    expiresAt,
+                    now
+            );
+        }
+
+        applyTransition(ReservationStatus.EXPIRED, now);
     }
 
     private void transitionTo(
             ReservationStatus targetStatus,
             Instant updatedAt
     ) {
+        validateTransition(targetStatus);
+        applyTransition(targetStatus, updatedAt);
+    }
+
+    private void validateTransition(ReservationStatus targetStatus) {
         Set<ReservationStatus> allowed =
                 ALLOWED_TRANSITIONS.getOrDefault(status, Set.of());
 
@@ -176,7 +192,12 @@ public class ReservationEntity {
                     targetStatus
             );
         }
+    }
 
+    private void applyTransition(
+            ReservationStatus targetStatus,
+            Instant updatedAt
+    ) {
         status = targetStatus;
         this.updatedAt = updatedAt;
     }

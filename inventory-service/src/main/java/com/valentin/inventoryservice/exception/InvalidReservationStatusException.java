@@ -8,20 +8,20 @@ import java.util.UUID;
 @Getter
 public class InvalidReservationStatusException extends InventoryServiceException{
 
-    private final UUID orderId;
+    private final UUID reservationId;
     private final ReservationStatus currentStatus;
     private final ReservationStatus requestedStatus;
 
     public InvalidReservationStatusException(
-            UUID orderId,
+            UUID reservationId,
             ReservationStatus currentStatus,
             ReservationStatus requestedStatus
     ) {
         super(ApiErrorCode.INVALID_TRANSITION,
-                "Invalid order status transition: orderId=%s, currentStatus=%s, requestedStatus=%s"
-                .formatted(orderId, currentStatus, requestedStatus));
+                "Invalid order status transition: reservationId=%s, currentStatus=%s, requestedStatus=%s"
+                .formatted(reservationId, currentStatus, requestedStatus));
 
-        this.orderId = orderId;
+        this.reservationId = reservationId;
         this.currentStatus = currentStatus;
         this.requestedStatus = requestedStatus;
 
