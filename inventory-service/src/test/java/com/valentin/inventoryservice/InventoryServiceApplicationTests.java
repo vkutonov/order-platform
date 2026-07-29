@@ -10,7 +10,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 
-@SpringBootTest
+@SpringBootTest(properties = "server.port=0")
 @Testcontainers
 class InventoryServiceApplicationTests {
 
