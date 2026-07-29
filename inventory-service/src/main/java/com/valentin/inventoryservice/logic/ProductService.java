@@ -91,14 +91,14 @@ public class ProductService {
 
     private InventoryItemEntity findItemByProductId(UUID productId) {
         return inventoryItemRepository.findByProductId(productId).orElseThrow(() ->
-                new ProductNotFoundException("Product not found productId = " + productId)
+                new ProductNotFoundException(productId)
         );
     }
 
 
     private ProductEntity findProduct(UUID id) {
         return productRepository.findById(id).orElseThrow(() ->
-                new ProductNotFoundException("Product not found productId = " + id)
+                new ProductNotFoundException(id)
         );
     }
 }

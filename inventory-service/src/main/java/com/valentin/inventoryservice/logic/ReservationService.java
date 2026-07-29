@@ -153,9 +153,7 @@ public class ReservationService {
         missingProductIds.removeAll(productsById.keySet());
 
         if (!missingProductIds.isEmpty()) {
-            throw new ProductNotFoundException(
-                    "Products not found for productIds: " + missingProductIds
-            );
+            throw new ProductNotFoundException(missingProductIds);
         }
 
         return productsById;
@@ -196,9 +194,7 @@ public class ReservationService {
         missingProductIds.removeAll(inventoryByProductIds.keySet());
 
         if (!missingProductIds.isEmpty()) {
-            throw new ProductNotFoundException(
-                    "Inventory items not found for productIds: " + missingProductIds
-            );
+            throw new ProductNotFoundException(missingProductIds);
         }
 
         return inventoryByProductIds;

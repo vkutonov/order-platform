@@ -2,7 +2,6 @@ package com.valentin.inventoryservice.domain;
 
 import com.valentin.inventoryservice.domain.dictionary.ReservationFailureCode;
 import com.valentin.inventoryservice.domain.dictionary.ReservationStatus;
-import com.valentin.inventoryservice.exception.ApiErrorCode;
 import com.valentin.inventoryservice.exception.DuplicateReservationProductException;
 import com.valentin.inventoryservice.exception.InvalidReservationStatusException;
 import com.valentin.inventoryservice.exception.ReservationNotExpiredException;
@@ -121,10 +120,7 @@ public class ReservationEntity {
         );
 
         if (duplicate) {
-            throw new DuplicateReservationProductException(
-                    ApiErrorCode.DUPLICATE_RESERVATION_PRODUCT,
-                    productId
-            );
+            throw new DuplicateReservationProductException(productId);
         }
 
         items.add(

@@ -68,9 +68,10 @@ public class InventoryItemEntity {
         int available = getAvailableQuantity();
 
         if (quantity > available) {
-            throw new InsufficientStockException(("Available quantity must be greater than %s ," +
-                    " but now available quantity = %s")
-                    .formatted(quantity, available)
+            throw InsufficientStockException.forAvailableStock(
+                    productId,
+                    quantity,
+                    available
             );
         }
 
@@ -81,9 +82,10 @@ public class InventoryItemEntity {
     public void commitReservation(int quantity, Instant updatedAt) {
 
         if (reservedQuantity < quantity) {
-            throw new InsufficientStockException(("Reserved quantity must be greater than %s ," +
-                    " but now reserved quantity = %s")
-                    .formatted(quantity, reservedQuantity)
+            throw InsufficientStockException.forReservedStock(
+                    productId,
+                    quantity,
+                    reservedQuantity
             );
         }
 
@@ -95,9 +97,10 @@ public class InventoryItemEntity {
     public void release(int quantity, Instant updatedAt) {
 
         if (reservedQuantity < quantity) {
-            throw new InsufficientStockException(("Reserved quantity must be greater than %s ," +
-                    " but now reserved quantity = %s")
-                    .formatted(quantity, reservedQuantity)
+            throw InsufficientStockException.forReservedStock(
+                    productId,
+                    quantity,
+                    reservedQuantity
             );
         }
 

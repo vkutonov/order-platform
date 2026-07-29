@@ -2,7 +2,7 @@ package com.valentin.inventoryservice.exception;
 
 import java.util.UUID;
 
-public class ReservationCommandConflictException extends InventoryServiceException {
+public final class ReservationCommandConflictException extends InventoryServiceException {
 
     public ReservationCommandConflictException(UUID orderId) {
         super(

@@ -3,7 +3,7 @@ package com.valentin.inventoryservice.exception;
 import java.time.Instant;
 import java.util.UUID;
 
-public class ReservationNotExpiredException extends InventoryServiceException {
+public final class ReservationNotExpiredException extends InventoryServiceException {
 
     public ReservationNotExpiredException(
             UUID orderId,

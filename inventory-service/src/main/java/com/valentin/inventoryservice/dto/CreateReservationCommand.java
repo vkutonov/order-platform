@@ -1,7 +1,6 @@
 package com.valentin.inventoryservice.dto;
 
 
-import com.valentin.inventoryservice.exception.ApiErrorCode;
 import com.valentin.inventoryservice.exception.DuplicateReservationProductException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -27,10 +26,7 @@ public record CreateReservationCommand(
 
         for (ReservationItemCommand item : items) {
             if (!productIds.add(item.productId())) {
-                throw new DuplicateReservationProductException(
-                        ApiErrorCode.DUPLICATE_RESERVATION_PRODUCT,
-                        item.productId()
-                );
+                throw new DuplicateReservationProductException(item.productId());
             }
         }
     }
