@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @Testcontainers
-public class OrderServiceIntegrationTest {
+public class OrderCommandServiceIntegrationTest {
 
     @Container
     static PostgreSQLContainer postgres =
@@ -37,8 +37,6 @@ public class OrderServiceIntegrationTest {
         registry.add("spring.datasource.password", postgres::getPassword);
     }
 
-    @Autowired
-    private OrderService orderService;
 
     @Autowired
     private OrderRepository orderRepository;
@@ -49,6 +47,8 @@ public class OrderServiceIntegrationTest {
     @Autowired
     private Clock clock;
 
+    @Autowired
+    private OrderCommandService orderCommandService;
 
     @Test
     void reserveInventory_shouldUpdateOrderAndSaveHistory() {
@@ -65,7 +65,7 @@ public class OrderServiceIntegrationTest {
 
         orderRepository.save(order);
 
-        orderService.reserveInventory(order.getId());
+        orderCommandService.reserveInventory(order.getId());
 
         OrderEntity updatedOrder = orderRepository.findById(order.getId()).orElseThrow();
 
