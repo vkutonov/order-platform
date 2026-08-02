@@ -18,12 +18,14 @@ public class OrderItemEntityTest {
                 productId,
                 "Ice cream",
                 new BigDecimal("67.00"),
+                "RUB",
                 3
         );
 
         assertThat(item.getProductId()).isEqualTo(productId);
         assertThat(item.getProductName()).isEqualTo("Ice cream");
         assertThat(item.getUnitPrice()).isEqualByComparingTo(new BigDecimal("67.00"));
+        assertThat(item.getCurrency()).isEqualTo("RUB");
         assertThat(item.getQuantity()).isEqualTo(3);
         assertThat(item.getTotalPrice()).isEqualByComparingTo(new BigDecimal("201.00"));
     }

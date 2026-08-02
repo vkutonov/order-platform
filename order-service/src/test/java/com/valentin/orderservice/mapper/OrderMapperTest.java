@@ -47,6 +47,7 @@ class OrderMapperTest {
                 productId,
                 "Keyboard",
                 new BigDecimal("10.50"),
+                "RUB",
                 2
         );
         ReflectionTestUtils.setField(item, "id", itemId);
@@ -66,6 +67,7 @@ class OrderMapperTest {
         assertThat(response.orderItems().getFirst().productId()).isEqualTo(productId);
         assertThat(response.orderItems().getFirst().productName()).isEqualTo("Keyboard");
         assertThat(response.orderItems().getFirst().unitPrice()).isEqualByComparingTo("10.50");
+        assertThat(response.orderItems().getFirst().currency()).isEqualTo("RUB");
         assertThat(response.orderItems().getFirst().quantity()).isEqualTo(2);
         assertThat(response.orderItems().getFirst().totalPrice()).isEqualByComparingTo("21.00");
     }
@@ -125,6 +127,7 @@ class OrderMapperTest {
                 UUID.randomUUID(),
                 "Keyboard",
                 new BigDecimal("46.00"),
+                "RUB",
                 1
         ));
 

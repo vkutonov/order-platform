@@ -2,6 +2,7 @@ package com.valentin.orderservice.domain;
 
 import com.valentin.orderservice.domain.dictionary.OrderStatus;
 import com.valentin.orderservice.exception.InvalidOrderStatusTransitionException;
+import com.valentin.orderservice.exception.MixedOrderCurrenciesException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -25,6 +26,7 @@ public class OrderEntityTest {
                 productId,
                 "Test name1",
                 new BigDecimal("150.00"),
+                "RUB",
                 2
         );
 
@@ -32,6 +34,7 @@ public class OrderEntityTest {
                 productId,
                 "Test name2",
                 new BigDecimal("100.00"),
+                "RUB",
                 1
         );
 
@@ -56,6 +59,7 @@ public class OrderEntityTest {
                 productId,
                 "Test name1",
                 new BigDecimal("150.00"),
+                "RUB",
                 2
         );
 
@@ -63,6 +67,7 @@ public class OrderEntityTest {
                 productId,
                 "Test name2",
                 new BigDecimal("100.00"),
+                "RUB",
                 1
         );
 
@@ -78,6 +83,25 @@ public class OrderEntityTest {
     public void recalculateTotalPrice_whenNoItems_shouldReturnZero() {
         OrderEntity order = createOrder();
 
+        assertThat(order.getTotalPrice()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(order.getCurrency()).isEqualTo("RUB");
+    }
+
+    @Test
+    void addItem_withDifferentCurrency_shouldRejectItem() {
+        OrderEntity order = createOrder();
+        OrderItemEntity item = OrderItemEntity.create(
+                UUID.randomUUID(),
+                "Test product",
+                new BigDecimal("100.00"),
+                "USD",
+                1
+        );
+
+        assertThatThrownBy(() -> order.addItem(item))
+                .isInstanceOf(MixedOrderCurrenciesException.class);
+
+        assertThat(order.getOrderItems()).isEmpty();
         assertThat(order.getTotalPrice()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 

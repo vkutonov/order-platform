@@ -24,7 +24,7 @@ public class OrderHistoryEntity {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id")
+    @JoinColumn(name = "order_id", nullable = false, updatable = false)
     private OrderEntity order;
 
     @Enumerated(EnumType.STRING)
@@ -32,14 +32,14 @@ public class OrderHistoryEntity {
     private OrderStatus oldStatus;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "new_status")
+    @Column(name = "new_status", nullable = false)
     private OrderStatus newStatus;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "reason")
     private OrderChangeHistoryReason reason;
 
-    @Column(name = "created_at")
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     public static OrderHistoryEntity create(

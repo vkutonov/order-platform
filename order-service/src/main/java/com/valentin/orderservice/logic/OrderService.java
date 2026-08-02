@@ -1,14 +1,19 @@
 package com.valentin.orderservice.logic;
 
+import com.valentin.orderservice.client.InventoryClient;
 import com.valentin.orderservice.db.OrderRepository;
 import com.valentin.orderservice.db.OrderHistoryRepository;
 import com.valentin.orderservice.db.OutboxEventRepository;
 import com.valentin.orderservice.domain.*;
 import com.valentin.orderservice.domain.dictionary.OrderChangeHistoryReason;
 import com.valentin.orderservice.domain.dictionary.OrderStatus;
+import com.valentin.orderservice.domain.dictionary.ProductStatus;
 import com.valentin.orderservice.domain.event.OrderCreatedEvent;
 import com.valentin.orderservice.dto.*;
+import com.valentin.orderservice.exception.MixedOrderCurrenciesException;
 import com.valentin.orderservice.exception.OrderNotFoundException;
+import com.valentin.orderservice.exception.ProductNotFoundException;
+import com.valentin.orderservice.exception.ProductUnavailableException;
 import com.valentin.orderservice.mapper.OrderMapper;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,10 +24,9 @@ import tools.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @AllArgsConstructor
@@ -33,11 +37,51 @@ public class OrderService {
     private final OrderHistoryRepository orderHistoryRepository;
     private final ObjectMapper objectMapper;
     private final OutboxEventRepository outboxEventRepository;
+    private final InventoryClient inventoryClient;
     private final Clock clock;
 
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest orderRequest) {
+
+        Set<UUID> productIds = orderRequest.items().stream()
+                .map(CreateOrderItemRequest::productId)
+                .collect(Collectors.toSet());
+
+        List<ProductSnapshot> products =
+                inventoryClient.getProductsSnapshot(new ProductsBatchRequest(productIds));
+
+        Map<UUID, ProductSnapshot> productsById = products.stream()
+                .collect(Collectors.toMap(
+                        ProductSnapshot::productId,
+                        Function.identity()
+                ));
+
+        Set<UUID> missingProductIds = new HashSet<>(productIds);
+        missingProductIds.removeAll(productsById.keySet());
+
+        if (!missingProductIds.isEmpty()) {
+            throw new ProductNotFoundException(missingProductIds);
+        }
+
+        Set<UUID> unavailableProductIds = products.stream()
+                .filter(product -> !ProductStatus.ACTIVE.equals(product.status()))
+                .map(ProductSnapshot::productId)
+                .collect(Collectors.toSet());
+
+        if (!unavailableProductIds.isEmpty()) {
+            throw new ProductUnavailableException(unavailableProductIds);
+        }
+
+        Set<String> currencies = products.stream()
+                .map(ProductSnapshot::currency)
+                .collect(Collectors.toSet());
+
+        if (currencies.size() != 1) {
+            throw new MixedOrderCurrenciesException(currencies);
+        }
+
+        String orderCurrency = currencies.iterator().next();
 
         Instant timeNow = clock.instant();
 
@@ -45,17 +89,20 @@ public class OrderService {
                 orderRequest.userId(),
                 new ArrayList<>(),
                 OrderStatus.WAITING_FOR_INVENTORY,
-                "RUB",
+                orderCurrency,
                 timeNow
         );
 
         List<CreateOrderItemRequest> itemsRequest = orderRequest.items();
 
         for (CreateOrderItemRequest item : itemsRequest) {
+            ProductSnapshot product = productsById.get(item.productId());
+
             OrderItemEntity orderItemEntity = OrderItemEntity.create(
-                    item.productId(),
-                    item.productName(),
-                    item.unitPrice(),
+                    product.productId(),
+                    product.productName(),
+                    product.unitPrice(),
+                    product.currency(),
                     item.quantity()
             );
 
@@ -81,6 +128,8 @@ public class OrderService {
 
         OrderCreatedEvent orderCreatedEvent = OrderCreatedEvent.of(
                 saved.getId(),
+                order.getUserId(),
+                mapper.toItemsPayload(order.getOrderItems()),
                 Map.of("source", "order-service"),
                 timeNow
         );

@@ -1,5 +1,6 @@
 package com.valentin.orderservice.logic;
 
+import com.valentin.orderservice.client.InventoryClient;
 import com.valentin.orderservice.db.OrderRepository;
 import com.valentin.orderservice.db.OrderHistoryRepository;
 import com.valentin.orderservice.db.OutboxEventRepository;
@@ -10,10 +11,15 @@ import com.valentin.orderservice.domain.OrderHistoryEntity;
 import com.valentin.orderservice.domain.OrderItemEntity;
 import com.valentin.orderservice.domain.dictionary.OrderStatus;
 import com.valentin.orderservice.domain.dictionary.OutboxEventStatus;
+import com.valentin.orderservice.domain.dictionary.ProductStatus;
 import com.valentin.orderservice.domain.event.OrderCreatedEvent;
+import com.valentin.orderservice.domain.event.OrderCreatedItemPayload;
 import com.valentin.orderservice.dto.*;
 import com.valentin.orderservice.exception.InvalidOrderStatusTransitionException;
+import com.valentin.orderservice.exception.MixedOrderCurrenciesException;
 import com.valentin.orderservice.exception.OrderNotFoundException;
+import com.valentin.orderservice.exception.ProductNotFoundException;
+import com.valentin.orderservice.exception.ProductUnavailableException;
 import com.valentin.orderservice.mapper.OrderMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,15 +36,23 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class OrderServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-07-13T12:00:00Z");
+    private static final UUID BICYCLE_PRODUCT_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID KEYBOARD_PRODUCT_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000002");
+    private static final UUID MOUSE_PRODUCT_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000003");
 
     @Mock
     private OrderRepository orderRepository;
@@ -54,6 +68,9 @@ public class OrderServiceTest {
 
     @Mock
     private ObjectMapper objectMapper;
+
+    @Mock
+    private InventoryClient inventoryClient;
 
     private OrderService orderService;
 
@@ -80,6 +97,7 @@ public class OrderServiceTest {
                 orderHistoryRepository,
                 objectMapper,
                 outboxEventRepository,
+                inventoryClient,
                 clock
         );
     }
@@ -89,6 +107,7 @@ public class OrderServiceTest {
 
         CreateOrderRequest orderRequest = createValidRequest();
         OrderResponse orderResponse = createOrderResponse();
+        mockInventoryProducts(orderRequest);
 
         when(orderRepository.save(any(OrderEntity.class)))
                 .thenAnswer(invocationOnMock -> invocationOnMock.getArgument(0));
@@ -108,11 +127,13 @@ public class OrderServiceTest {
         verify(orderMapper).toOrderResponse(order);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.WAITING_FOR_INVENTORY);
+        assertThat(order.getCurrency()).isEqualTo("RUB");
         assertThat(order.getCreatedAt()).isNotNull();
         assertThat(order.getUpdatedAt()).isEqualTo(order.getCreatedAt());
         assertThat(order.getOrderItems()).hasSize(1);
         assertThat(order.getOrderItems().getFirst().getProductName()).isEqualTo("Bicycle");
         assertThat(order.getOrderItems().getFirst().getUnitPrice()).isEqualByComparingTo("444.44");
+        assertThat(order.getOrderItems().getFirst().getCurrency()).isEqualTo("RUB");
         assertThat(order.getOrderItems().getFirst().getQuantity()).isEqualTo(2);
         assertThat(order.getOrderItems().getFirst().getTotalPrice()).isEqualByComparingTo("888.88");
         assertThat(order.getOrderItems().getFirst().getOrder()).isSameAs(order);
@@ -132,6 +153,7 @@ public class OrderServiceTest {
 
         CreateOrderRequest orderRequest = createValidRequestWithMultipleItems();
         OrderResponse orderResponse = createOrderResponse();
+        mockInventoryProducts(orderRequest);
 
         when(orderRepository.save(any(OrderEntity.class)))
                 .thenAnswer(invocationOnMock -> invocationOnMock.getArgument(0));
@@ -150,6 +172,95 @@ public class OrderServiceTest {
 
         assertThat(order.getOrderItems()).hasSize(2);
         assertThat(order.getTotalPrice()).isEqualByComparingTo("46.00");
+        assertThat(order.getCurrency()).isEqualTo("RUB");
+    }
+
+    @Test
+    void createOrder_withDifferentCurrencies_shouldRejectOrder() {
+        CreateOrderRequest request = createValidRequestWithMultipleItems();
+        Set<UUID> requestedIds = Set.of(KEYBOARD_PRODUCT_ID, MOUSE_PRODUCT_ID);
+
+        when(inventoryClient.getProductsSnapshot(new ProductsBatchRequest(requestedIds)))
+                .thenReturn(List.of(
+                        new ProductSnapshot(
+                                KEYBOARD_PRODUCT_ID,
+                                "Keyboard",
+                                new BigDecimal("10.50"),
+                                "RUB",
+                                ProductStatus.ACTIVE
+                        ),
+                        new ProductSnapshot(
+                                MOUSE_PRODUCT_ID,
+                                "Mouse",
+                                new BigDecimal("25.00"),
+                                "USD",
+                                ProductStatus.ACTIVE
+                        )
+                ));
+
+        assertThatThrownBy(() -> orderService.createOrder(request))
+                .isInstanceOf(MixedOrderCurrenciesException.class)
+                .hasMessageContaining("RUB")
+                .hasMessageContaining("USD");
+
+        verifyNoInteractions(
+                orderRepository,
+                orderHistoryRepository,
+                outboxEventRepository
+        );
+    }
+
+    @Test
+    void createOrder_whenInventoryResponseMissesProduct_shouldRejectOrder() {
+        CreateOrderRequest request = createValidRequestWithMultipleItems();
+        Set<UUID> requestedIds = Set.of(KEYBOARD_PRODUCT_ID, MOUSE_PRODUCT_ID);
+
+        when(inventoryClient.getProductsSnapshot(new ProductsBatchRequest(requestedIds)))
+                .thenReturn(List.of(
+                        new ProductSnapshot(
+                                KEYBOARD_PRODUCT_ID,
+                                "Keyboard",
+                                new BigDecimal("10.50"),
+                                "RUB",
+                                ProductStatus.ACTIVE
+                        )
+                ));
+
+        assertThatThrownBy(() -> orderService.createOrder(request))
+                .isInstanceOf(ProductNotFoundException.class)
+                .hasMessageContaining(MOUSE_PRODUCT_ID.toString());
+
+        verifyNoInteractions(orderRepository, orderHistoryRepository, outboxEventRepository);
+    }
+
+    @Test
+    void createOrder_whenProductIsInactive_shouldRejectOrder() {
+        CreateOrderRequest request = createValidRequestWithMultipleItems();
+        Set<UUID> requestedIds = Set.of(KEYBOARD_PRODUCT_ID, MOUSE_PRODUCT_ID);
+
+        when(inventoryClient.getProductsSnapshot(new ProductsBatchRequest(requestedIds)))
+                .thenReturn(List.of(
+                        new ProductSnapshot(
+                                KEYBOARD_PRODUCT_ID,
+                                "Keyboard",
+                                new BigDecimal("10.50"),
+                                "RUB",
+                                ProductStatus.INACTIVE
+                        ),
+                        new ProductSnapshot(
+                                MOUSE_PRODUCT_ID,
+                                "Mouse",
+                                new BigDecimal("25.00"),
+                                "RUB",
+                                ProductStatus.ACTIVE
+                        )
+                ));
+
+        assertThatThrownBy(() -> orderService.createOrder(request))
+                .isInstanceOf(ProductUnavailableException.class)
+                .hasMessageContaining(KEYBOARD_PRODUCT_ID.toString());
+
+        verifyNoInteractions(orderRepository, orderHistoryRepository, outboxEventRepository);
     }
 
 
@@ -159,6 +270,24 @@ public class OrderServiceTest {
         Instant timeNow = NOW;
 
         CreateOrderRequest request = createValidRequestWithMultipleItems();
+        mockInventoryProducts(request);
+
+        List<OrderCreatedItemPayload> itemPayloads = List.of(
+                new OrderCreatedItemPayload(
+                        KEYBOARD_PRODUCT_ID,
+                        "Keyboard",
+                        new BigDecimal("10.50"),
+                        "RUB",
+                        2
+                ),
+                new OrderCreatedItemPayload(
+                        MOUSE_PRODUCT_ID,
+                        "Mouse",
+                        new BigDecimal("25.00"),
+                        "RUB",
+                        1
+                )
+        );
 
         OrderEntity order = OrderEntity.createOrderEntity(
                 request.userId(),
@@ -183,6 +312,8 @@ public class OrderServiceTest {
 
         when(orderRepository.save(any(OrderEntity.class)))
                 .thenReturn(order);
+        when(orderMapper.toItemsPayload(anyList()))
+                .thenReturn(itemPayloads);
         when(objectMapper.writeValueAsString(any(OrderCreatedEvent.class)))
                 .thenReturn(payload);
 
@@ -204,6 +335,9 @@ public class OrderServiceTest {
         OrderCreatedEvent event = orderCreatedEventCaptor.getValue();
 
         assertThat(event.orderId()).isEqualTo(order.getId());
+        assertThat(event.userId()).isEqualTo(request.userId());
+        assertThat(event.items()).isEqualTo(itemPayloads);
+        assertThat(event.items()).allMatch(item -> item.currency().equals("RUB"));
         assertThat(event.context()).containsEntry("source", "order-service");
         assertThat(event.occurredAt()).isNotNull();
         assertThat(event.eventId()).isNotNull();
@@ -252,6 +386,7 @@ public class OrderServiceTest {
                 UUID.randomUUID(),
                 "Desk",
                 new BigDecimal("100.00"),
+                "RUB",
                 1
         ));
 
@@ -384,6 +519,7 @@ public class OrderServiceTest {
                 UUID.randomUUID(),
                 "Bicycle",
                 new BigDecimal("444.44"),
+                "RUB",
                 2,
                 new BigDecimal("888.88")
         );
@@ -549,9 +685,7 @@ public class OrderServiceTest {
 
     private CreateOrderRequest createValidRequest() {
         CreateOrderItemRequest item1 = new CreateOrderItemRequest(
-                UUID.randomUUID(),
-                "Bicycle",
-                new BigDecimal("444.44"),
+                BICYCLE_PRODUCT_ID,
                 2
         );
 
@@ -563,16 +697,12 @@ public class OrderServiceTest {
 
     private CreateOrderRequest createValidRequestWithMultipleItems() {
         CreateOrderItemRequest item1 = new CreateOrderItemRequest(
-                UUID.randomUUID(),
-                "Keyboard",
-                new BigDecimal("10.50"),
+                KEYBOARD_PRODUCT_ID,
                 2
         );
 
         CreateOrderItemRequest item2 = new CreateOrderItemRequest(
-                UUID.randomUUID(),
-                "Mouse",
-                new BigDecimal("25.00"),
+                MOUSE_PRODUCT_ID,
                 1
         );
 
@@ -580,5 +710,45 @@ public class OrderServiceTest {
                 UUID.randomUUID(),
                 List.of(item1, item2)
         );
+    }
+
+    private void mockInventoryProducts(CreateOrderRequest request) {
+        Map<UUID, ProductSnapshot> productsById = Map.of(
+                BICYCLE_PRODUCT_ID,
+                new ProductSnapshot(
+                        BICYCLE_PRODUCT_ID,
+                        "Bicycle",
+                        new BigDecimal("444.44"),
+                        "RUB",
+                        ProductStatus.ACTIVE
+                ),
+                KEYBOARD_PRODUCT_ID,
+                new ProductSnapshot(
+                        KEYBOARD_PRODUCT_ID,
+                        "Keyboard",
+                        new BigDecimal("10.50"),
+                        "RUB",
+                        ProductStatus.ACTIVE
+                ),
+                MOUSE_PRODUCT_ID,
+                new ProductSnapshot(
+                        MOUSE_PRODUCT_ID,
+                        "Mouse",
+                        new BigDecimal("25.00"),
+                        "RUB",
+                        ProductStatus.ACTIVE
+                )
+        );
+
+        Set<UUID> requestedIds = request.items().stream()
+                .map(CreateOrderItemRequest::productId)
+                .collect(Collectors.toSet());
+
+        List<ProductSnapshot> products = requestedIds.stream()
+                .map(productsById::get)
+                .toList();
+
+        when(inventoryClient.getProductsSnapshot(new ProductsBatchRequest(requestedIds)))
+                .thenReturn(products);
     }
 }

@@ -1,8 +1,12 @@
 package com.valentin.orderservice.api;
 
 import com.jayway.jsonpath.JsonPath;
+import com.valentin.orderservice.client.InventoryClient;
 import com.valentin.orderservice.db.OrderRepository;
 import com.valentin.orderservice.db.OrderHistoryRepository;
+import com.valentin.orderservice.domain.dictionary.ProductStatus;
+import com.valentin.orderservice.dto.ProductSnapshot;
+import com.valentin.orderservice.dto.ProductsBatchRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,17 +15,21 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -53,6 +61,9 @@ class OrderControllerIntegrationTest {
     @Autowired
     OrderHistoryRepository orderHistoryRepository;
 
+    @MockitoBean
+    InventoryClient inventoryClient;
+
     @DynamicPropertySource
     static void configurePostgres(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
@@ -64,6 +75,24 @@ class OrderControllerIntegrationTest {
     void cleanDatabase() {
         orderHistoryRepository.deleteAll();
         orderRepository.deleteAll();
+
+        when(inventoryClient.getProductsSnapshot(any(ProductsBatchRequest.class)))
+                .thenReturn(List.of(
+                        new ProductSnapshot(
+                                FIRST_PRODUCT_ID,
+                                "Keyboard",
+                                new BigDecimal("10.50"),
+                                "RUB",
+                                ProductStatus.ACTIVE
+                        ),
+                        new ProductSnapshot(
+                                SECOND_PRODUCT_ID,
+                                "Mouse",
+                                new BigDecimal("25.00"),
+                                "RUB",
+                                ProductStatus.ACTIVE
+                        )
+                ));
     }
 
     @Test
@@ -82,16 +111,50 @@ class OrderControllerIntegrationTest {
                 .andExpect(jsonPath("$.orderItems[0].productId").value(FIRST_PRODUCT_ID.toString()))
                 .andExpect(jsonPath("$.orderItems[0].productName").value("Keyboard"))
                 .andExpect(jsonPath("$.orderItems[0].unitPrice").value(10.5))
+                .andExpect(jsonPath("$.orderItems[0].currency").value("RUB"))
                 .andExpect(jsonPath("$.orderItems[0].quantity").value(2))
                 .andExpect(jsonPath("$.orderItems[0].totalPrice").value(21.0))
                 .andExpect(jsonPath("$.orderItems[1].productId").value(SECOND_PRODUCT_ID.toString()))
                 .andExpect(jsonPath("$.orderItems[1].productName").value("Mouse"))
                 .andExpect(jsonPath("$.orderItems[1].unitPrice").value(25.0))
+                .andExpect(jsonPath("$.orderItems[1].currency").value("RUB"))
                 .andExpect(jsonPath("$.orderItems[1].quantity").value(1))
                 .andExpect(jsonPath("$.orderItems[1].totalPrice").value(25.0));
 
         assertThat(orderRepository.count()).isEqualTo(1);
         assertThat(orderHistoryRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void createOrder_withDifferentCurrencies_returnsUnprocessableContent() throws Exception {
+        when(inventoryClient.getProductsSnapshot(any(ProductsBatchRequest.class)))
+                .thenReturn(List.of(
+                        new ProductSnapshot(
+                                FIRST_PRODUCT_ID,
+                                "Keyboard",
+                                new BigDecimal("10.50"),
+                                "RUB",
+                                ProductStatus.ACTIVE
+                        ),
+                        new ProductSnapshot(
+                                SECOND_PRODUCT_ID,
+                                "Mouse",
+                                new BigDecimal("25.00"),
+                                "USD",
+                                ProductStatus.ACTIVE
+                        )
+                ));
+
+        mockMvc.perform(post("/api/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCreateOrderJson()))
+                .andExpect(status().is(422))
+                .andExpect(jsonPath("$.code").value("MIXED_ORDER_CURRENCIES"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("RUB")))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("USD")));
+
+        assertThat(orderRepository.count()).isZero();
+        assertThat(orderHistoryRepository.count()).isZero();
     }
 
     @Test
@@ -114,7 +177,9 @@ class OrderControllerIntegrationTest {
                 .andExpect(jsonPath("$.status").value("WAITING_FOR_INVENTORY"))
                 .andExpect(jsonPath("$.totalPrice").value(46.0))
                 .andExpect(jsonPath("$.currency").value("RUB"))
-                .andExpect(jsonPath("$.orderItems", hasSize(2)));
+                .andExpect(jsonPath("$.orderItems", hasSize(2)))
+                .andExpect(jsonPath("$.orderItems[0].currency").value("RUB"))
+                .andExpect(jsonPath("$.orderItems[1].currency").value("RUB"));
     }
 
     @Test
@@ -238,14 +303,10 @@ class OrderControllerIntegrationTest {
                   "items": [
                     {
                       "productId": "%s",
-                      "productName": "Keyboard",
-                      "unitPrice": 10.50,
                       "quantity": 2
                     },
                     {
                       "productId": "%s",
-                      "productName": "Mouse",
-                      "unitPrice": 25.00,
                       "quantity": 1
                     }
                   ]

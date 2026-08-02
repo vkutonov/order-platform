@@ -2,6 +2,14 @@ server:
   port: ${ORDER_SERVICE_PORT:8081}
 
 spring:
+  http:
+    serviceclient:
+      inventory:
+        base-url: ${INVENTORY_SERVICE_URL:http://localhost:8082}
+        connect-timeout: 2s
+        read-timeout: 3s
+
+
   config:
     import:
       - optional:file:.env[.properties]
@@ -37,7 +45,6 @@ spring:
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
       properties:
         "[enable.idempotence]": true
-
 
 
 app:
