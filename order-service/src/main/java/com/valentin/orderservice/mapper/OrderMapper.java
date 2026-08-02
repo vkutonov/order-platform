@@ -4,6 +4,7 @@ package com.valentin.orderservice.mapper;
 import com.valentin.orderservice.domain.OrderEntity;
 import com.valentin.orderservice.domain.OrderHistoryEntity;
 import com.valentin.orderservice.domain.OrderItemEntity;
+import com.valentin.orderservice.domain.event.OrderCreatedItemPayload;
 import com.valentin.orderservice.dto.*;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -15,7 +16,9 @@ public interface OrderMapper {
 
     OrderResponse toOrderResponse(OrderEntity entity);
 
-    OrderItemResponse toOrderItemResponse(OrderItemEntity entity);
+    OrderCreatedItemPayload toItemPayload(OrderItemEntity entity);
+
+    List<OrderCreatedItemPayload> toItemsPayload(List<OrderItemEntity> entities);
 
     OrderSummaryResponse toOrderSummaryResponse(OrderEntity entity);
 

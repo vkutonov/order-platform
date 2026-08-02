@@ -2,6 +2,7 @@ package com.valentin.orderservice.domain;
 
 import com.valentin.orderservice.domain.dictionary.OrderStatus;
 import com.valentin.orderservice.exception.InvalidOrderStatusTransitionException;
+import com.valentin.orderservice.exception.MixedOrderCurrenciesException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -32,26 +33,26 @@ public class OrderEntity {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @Column(name = "user_id")
+    @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItemEntity> orderItems = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status")
+    @Column(name = "status", nullable = false)
     private OrderStatus status;
 
-    @Column(name = "total_price", precision = 19, scale = 2)
+    @Column(name = "total_price", precision = 19, scale = 2, nullable = false)
     private BigDecimal totalPrice;
 
-    @Column(name = "currency", length = 3)
+    @Column(name = "currency", nullable = false, updatable = false, length = 3)
     private String currency;
 
-    @Column(name = "created_at")
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    @Column(name = "updated_at")
+    @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
     @Column(name = "version")
@@ -65,17 +66,21 @@ public class OrderEntity {
     }
 
     public void addItem(OrderItemEntity item) {
+        if (!Objects.equals(currency, item.getCurrency())) {
+            throw new MixedOrderCurrenciesException(currency, item.getCurrency());
+        }
+
         orderItems.add(item);
         item.setReferenceToOrder(this);
         recalculateTotalPrice();
     }
 
     public static OrderEntity createOrderEntity(
-        UUID userId,
-        List<OrderItemEntity> items,
-        OrderStatus status,
-        String currency,
-        Instant timeNow
+            UUID userId,
+            List<OrderItemEntity> items,
+            OrderStatus status,
+            String currency,
+            Instant timeNow
     ) {
         OrderEntity order = new OrderEntity();
 

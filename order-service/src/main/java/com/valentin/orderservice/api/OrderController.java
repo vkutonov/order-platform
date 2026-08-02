@@ -1,6 +1,8 @@
 package com.valentin.orderservice.api;
 
 import com.valentin.orderservice.dto.*;
+import com.valentin.orderservice.logic.OrderCommandService;
+import com.valentin.orderservice.logic.OrderQueryService;
 import com.valentin.orderservice.logic.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -16,12 +18,14 @@ import java.util.UUID;
 @RequestMapping("/api/orders")
 public class OrderController {
     private final OrderService orderService;
+    private final OrderCommandService orderCommandService;
+    private final OrderQueryService orderQueryService;
 
     @GetMapping("/{id}")
     public ResponseEntity<OrderResponse> getOrderById(
             @PathVariable UUID id
     ) {
-        OrderResponse response = orderService.getOrderById(id);
+        OrderResponse response = orderQueryService.getOrderById(id);
         return ResponseEntity.ok(response);
     }
 
@@ -29,7 +33,7 @@ public class OrderController {
     public ResponseEntity<OrderSummaryResponseList> getOrdersByUserId(
             @PathVariable UUID userId
     ) {
-        OrderSummaryResponseList orders = orderService.getOrdersByUserId(userId);
+        OrderSummaryResponseList orders = orderQueryService.getOrdersByUserId(userId);
         return ResponseEntity.ok(orders);
     }
 
@@ -37,7 +41,7 @@ public class OrderController {
     public ResponseEntity<List<OrderHistoryResponse>> getOrderHistoryById(
             @PathVariable UUID id
     ) {
-        List<OrderHistoryResponse> response = orderService.getOrderHistoryById(id);
+        List<OrderHistoryResponse> response = orderQueryService.getOrderHistoryById(id);
         return ResponseEntity.ok(response);
     }
 
@@ -55,30 +59,30 @@ public class OrderController {
     @PostMapping("/{id}/reserve")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void reserveInventory(@PathVariable UUID id) {
-        orderService.reserveInventory(id);
+        orderCommandService.reserveInventory(id);
     }
 
     @PostMapping("/{id}/inventory-failed")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void inventoryReservationFailed(@PathVariable UUID id) {
-        orderService.inventoryReservationFailed(id);
+        orderCommandService.inventoryReservationFailed(id);
     }
 
     @PostMapping("/{id}/payment-success")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void confirmPayment(@PathVariable UUID id) {
-        orderService.markPaymentSucceeded(id);
+        orderCommandService.markPaymentSucceeded(id);
     }
 
     @PostMapping("/{id}/payment-failed")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void paymentFailed(@PathVariable UUID id) {
-        orderService.markPaymentFailed(id);
+        orderCommandService.markPaymentFailed(id);
     }
 
     @PostMapping("/{id}/cancel")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void cancelOrder(@PathVariable UUID id) {
-        orderService.cancelOrder(id);
+        orderCommandService.cancelOrder(id);
     }
 }

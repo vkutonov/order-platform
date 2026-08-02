@@ -4,8 +4,9 @@ import com.valentin.orderservice.domain.dictionary.OrderStatus;
 import lombok.Getter;
 
 import java.util.UUID;
+
 @Getter
-public class InvalidOrderStatusTransitionException extends RuntimeException{
+public final class InvalidOrderStatusTransitionException extends OrderServiceException {
 
     private final UUID orderId;
     private final OrderStatus currentStatus;
@@ -16,13 +17,14 @@ public class InvalidOrderStatusTransitionException extends RuntimeException{
             OrderStatus currentStatus,
             OrderStatus requestedStatus
     ) {
-        super("Invalid order status transition: orderId=%s, currentStatus=%s, requestedStatus=%s"
-                .formatted(orderId, currentStatus, requestedStatus));
+        super(
+                ApiErrorCode.INVALID_ORDER_STATUS_TRANSITION,
+                "Order cannot be moved from %s to %s"
+                        .formatted(currentStatus, requestedStatus)
+        );
 
         this.orderId = orderId;
         this.currentStatus = currentStatus;
         this.requestedStatus = requestedStatus;
-
-
     }
 }

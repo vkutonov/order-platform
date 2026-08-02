@@ -20,61 +20,30 @@ import java.util.List;
 @RequiredArgsConstructor
 public class GlobalExceptionHandler {
 
+    private static final String INTERNAL_SERVER_ERROR_MESSAGE = "Internal server error";
+
     private final Clock clock;
 
-    @ExceptionHandler(OrderNotFoundException.class)
-    public ResponseEntity<ClientErrorResponse> handleOrderNotFound(
-            OrderNotFoundException exception,
+    @ExceptionHandler(OrderServiceException.class)
+    public ResponseEntity<ClientErrorResponse> handleOrderServiceException(
+            OrderServiceException exception,
             HttpServletRequest request
     ) {
-        HttpStatus status = HttpStatus.NOT_FOUND;
+        ApiErrorCode errorCode = exception.getErrorCode();
 
         log.warn(
-                "Order not found: path={}, message={}",
+                "Order operation failed: path={}, code={}, message={}",
                 request.getRequestURI(),
+                errorCode,
                 exception.getMessage()
         );
 
-        ClientErrorResponse response = clientErrorResponse(
-                status,
-                "ORDER_NOT_FOUND",
+        return clientErrorResponse(
+                errorCode,
                 exception.getMessage(),
                 request,
                 List.of()
         );
-
-        return ResponseEntity
-                .status(status)
-                .body(response);
-    }
-
-    @ExceptionHandler(InvalidOrderStatusTransitionException.class)
-    public ResponseEntity<ClientErrorResponse> handleInvalidOrderStatusTransition(
-            InvalidOrderStatusTransitionException exception,
-            HttpServletRequest request
-    ) {
-        HttpStatus status = HttpStatus.CONFLICT;
-
-        log.warn(
-                "Invalid order status transition: path={}, orderId={}, currentStatus={}, requestedStatus={}",
-                request.getRequestURI(),
-                exception.getOrderId(),
-                exception.getCurrentStatus(),
-                exception.getRequestedStatus()
-        );
-
-        ClientErrorResponse response = clientErrorResponse(
-                status,
-                "INVALID_ORDER_STATUS_TRANSITION",
-                "Order cannot be moved from %s to %s"
-                        .formatted(exception.getCurrentStatus(), exception.getRequestedStatus()),
-                request,
-                List.of()
-        );
-
-        return ResponseEntity
-                .status(status)
-                .body(response);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -82,8 +51,6 @@ public class GlobalExceptionHandler {
             MethodArgumentNotValidException exception,
             HttpServletRequest request
     ) {
-        HttpStatus status = HttpStatus.BAD_REQUEST;
-
         List<FieldErrorResponse> fieldErrors = exception.getBindingResult()
                 .getFieldErrors()
                 .stream()
@@ -99,17 +66,12 @@ public class GlobalExceptionHandler {
                 fieldErrors.size()
         );
 
-        ClientErrorResponse response = clientErrorResponse(
-                status,
-                "VALIDATION_FAILED",
+        return clientErrorResponse(
+                ApiErrorCode.VALIDATION_FAILED,
                 "Request validation failed",
                 request,
                 fieldErrors
         );
-
-        return ResponseEntity
-                .status(status)
-                .body(response);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -117,25 +79,18 @@ public class GlobalExceptionHandler {
             HttpMessageNotReadableException exception,
             HttpServletRequest request
     ) {
-        HttpStatus status = HttpStatus.BAD_REQUEST;
-
         log.warn(
                 "Invalid request body: path={}, message={}",
                 request.getRequestURI(),
                 exception.getMostSpecificCause().getMessage()
         );
 
-        ClientErrorResponse response = clientErrorResponse(
-                status,
-                "INVALID_REQUEST_BODY",
+        return clientErrorResponse(
+                ApiErrorCode.INVALID_REQUEST_BODY,
                 "Invalid request body",
                 request,
                 List.of()
         );
-
-        return ResponseEntity
-                .status(status)
-                .body(response);
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -143,8 +98,6 @@ public class GlobalExceptionHandler {
             MethodArgumentTypeMismatchException exception,
             HttpServletRequest request
     ) {
-        HttpStatus status = HttpStatus.BAD_REQUEST;
-
         String message = "Invalid value for parameter '" + exception.getName() + "'";
 
         log.warn(
@@ -155,17 +108,12 @@ public class GlobalExceptionHandler {
                 exception.getRequiredType() != null ? exception.getRequiredType().getSimpleName() : null
         );
 
-        ClientErrorResponse response = clientErrorResponse(
-                status,
-                "INVALID_PARAMETER_VALUE",
+        return clientErrorResponse(
+                ApiErrorCode.INVALID_PARAMETER_VALUE,
                 message,
                 request,
                 List.of()
         );
-
-        return ResponseEntity
-                .status(status)
-                .body(response);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
@@ -173,8 +121,6 @@ public class GlobalExceptionHandler {
             NoResourceFoundException exception,
             HttpServletRequest request
     ) {
-        HttpStatus status = HttpStatus.NOT_FOUND;
-
         String message = "Resource not found";
 
         log.warn(
@@ -182,17 +128,12 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
 
-        ClientErrorResponse response = clientErrorResponse(
-                status,
-                "RESOURCE_NOT_FOUND",
+        return clientErrorResponse(
+                ApiErrorCode.RESOURCE_NOT_FOUND,
                 message,
                 request,
                 List.of()
         );
-
-        return ResponseEntity
-                .status(status)
-                .body(response);
     }
 
 
@@ -213,7 +154,7 @@ public class GlobalExceptionHandler {
                 clock.instant(),
                 status.value(),
                 status.getReasonPhrase(),
-                "Internal server error",
+                INTERNAL_SERVER_ERROR_MESSAGE,
                 request.getRequestURI()
         );
 
@@ -222,21 +163,23 @@ public class GlobalExceptionHandler {
                 .body(response);
     }
 
-    private ClientErrorResponse clientErrorResponse(
-            HttpStatus status,
-            String code,
+    private ResponseEntity<ClientErrorResponse> clientErrorResponse(
+            ApiErrorCode errorCode,
             String message,
             HttpServletRequest request,
             List<FieldErrorResponse> fieldErrors
     ) {
-        return new ClientErrorResponse(
+        HttpStatus status = errorCode.status();
+        ClientErrorResponse response = new ClientErrorResponse(
                 clock.instant(),
                 status.value(),
                 status.getReasonPhrase(),
-                code,
+                errorCode.name(),
                 message,
                 request.getRequestURI(),
                 fieldErrors
         );
+
+        return ResponseEntity.status(status).body(response);
     }
 }

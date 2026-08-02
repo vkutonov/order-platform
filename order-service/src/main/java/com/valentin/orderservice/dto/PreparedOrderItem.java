@@ -3,13 +3,10 @@ package com.valentin.orderservice.dto;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-public record OrderItemResponse (
-        UUID id,
+public record PreparedOrderItem(
         UUID productId,
         String productName,
         BigDecimal unitPrice,
-        String currency,
-        Integer quantity,
-        BigDecimal totalPrice
+        int quantity
 ) {
 }

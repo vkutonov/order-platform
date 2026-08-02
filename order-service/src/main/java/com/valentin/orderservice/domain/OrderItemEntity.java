@@ -25,19 +25,22 @@ public class OrderItemEntity {
     @JoinColumn(name = "order_id", nullable = false)
     private OrderEntity order;
 
-    @Column(name = "product_id")
+    @Column(name = "product_id", nullable = false, updatable = false)
     private UUID productId;
 
-    @Column(name = "product_name")
+    @Column(name = "product_name", nullable = false)
     private String productName;
 
-    @Column(name = "unit_price", precision = 19, scale = 2)
+    @Column(name = "unit_price", precision = 19, scale = 2, nullable = false)
     private BigDecimal unitPrice;
 
-    @Column(name = "quantity")
+    @Column(name = "currency", nullable = false, updatable = false)
+    private String currency;
+
+    @Column(name = "quantity", nullable = false)
     private Integer quantity;
 
-    @Column(name = "total_price", precision = 19, scale = 2)
+    @Column(name = "total_price", precision = 19, scale = 2, nullable = false)
     private BigDecimal totalPrice;
 
     void setReferenceToOrder(OrderEntity order) {
@@ -48,12 +51,14 @@ public class OrderItemEntity {
             UUID productId,
             String productName,
             BigDecimal unitPrice,
+            String currency,
             Integer quantity
     ) {
         OrderItemEntity orderItem = new OrderItemEntity();
         orderItem.productId = productId;
         orderItem.productName = productName;
         orderItem.unitPrice = unitPrice;
+        orderItem.currency = currency;
         orderItem.quantity = quantity;
         orderItem.totalPrice = unitPrice.multiply(BigDecimal.valueOf(quantity));
 
