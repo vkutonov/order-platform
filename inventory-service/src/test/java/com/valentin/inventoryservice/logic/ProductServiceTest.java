@@ -8,6 +8,7 @@ import com.valentin.inventoryservice.domain.dictionary.ProductStatus;
 import com.valentin.inventoryservice.dto.CreateProductRequest;
 import com.valentin.inventoryservice.dto.InventoryProductResponse;
 import com.valentin.inventoryservice.dto.ProductResponse;
+import com.valentin.inventoryservice.dto.ProductSnapshotResponse;
 import com.valentin.inventoryservice.exception.ProductNotFoundException;
 import com.valentin.inventoryservice.mapper.InventoryProductMapper;
 import com.valentin.inventoryservice.mapper.ProductMapper;
@@ -19,7 +20,9 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -145,11 +148,53 @@ class ProductServiceTest {
         verifyNoInteractions(inventoryItemRepository);
     }
 
+    @Test
+    void findProductsReturnsSnapshotsForAllRequestedIds() {
+        UUID secondProductId =
+                UUID.fromString("00000000-0000-0000-0000-000000000002");
+        ProductEntity firstProduct = product(PRODUCT_ID);
+        ProductEntity secondProduct = product(secondProductId);
+        Set<UUID> productIds = Set.of(PRODUCT_ID, secondProductId);
+
+        when(productRepository.findAllById(productIds))
+                .thenReturn(List.of(firstProduct, secondProduct));
+
+        List<ProductSnapshotResponse> result =
+                productService.findProducts(productIds);
+
+        assertThat(result)
+                .extracting(ProductSnapshotResponse::productId)
+                .containsExactlyInAnyOrder(PRODUCT_ID, secondProductId);
+        assertThat(result)
+                .allSatisfy(product -> {
+                    assertThat(product.productName()).isEqualTo("Keyboard");
+                    assertThat(product.unitPrice()).isEqualByComparingTo("5000.00");
+                    assertThat(product.currency()).isEqualTo("RUB");
+                    assertThat(product.status()).isEqualTo(ProductStatus.ACTIVE);
+                });
+    }
+
+    @Test
+    void findProductsWhenOneProductIsMissingThrowsProductNotFound() {
+        UUID missingProductId =
+                UUID.fromString("00000000-0000-0000-0000-000000000002");
+        Set<UUID> productIds = Set.of(PRODUCT_ID, missingProductId);
+        ProductEntity existingProduct = product(PRODUCT_ID);
+
+        when(productRepository.findAllById(productIds))
+                .thenReturn(List.of(existingProduct));
+
+        assertThatThrownBy(() -> productService.findProducts(productIds))
+                .isInstanceOf(ProductNotFoundException.class)
+                .hasMessageContaining(missingProductId.toString());
+    }
+
     private ProductEntity product(UUID productId) {
         ProductEntity product = mock(ProductEntity.class);
         when(product.getId()).thenReturn(productId);
         when(product.getName()).thenReturn("Keyboard");
         when(product.getUnitPrice()).thenReturn(new BigDecimal("5000.00"));
+        when(product.getCurrency()).thenReturn("RUB");
         when(product.getStatus()).thenReturn(ProductStatus.ACTIVE);
         return product;
     }
