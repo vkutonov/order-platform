@@ -1,8 +1,8 @@
 package com.valentin.orderservice.exception;
 
-public class OrderNotFoundException extends RuntimeException {
+public final class OrderNotFoundException extends OrderServiceException {
 
     public OrderNotFoundException(String message) {
-        super(message);
+        super(ApiErrorCode.ORDER_NOT_FOUND, message);
     }
 }
