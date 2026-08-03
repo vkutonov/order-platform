@@ -28,6 +28,38 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+    consumer:
+      group-id: inventory-order-created-v1
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      max-poll-records: 50
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+      acks: all
+
+      properties:
+        enable.idempotence: true
+
+    listener:
+      type: single
+      ack-mode: batch  # так как настроена идемпотентная обработка сообщений
+      concurrency: 1
+
+app:
+  kafka:
+    topics:
+      order-events: order.events
+      order-events-dlt: order.events.inventory-service.dlt
+
 logging:
   level:
     org.hibernate.SQL: debug
