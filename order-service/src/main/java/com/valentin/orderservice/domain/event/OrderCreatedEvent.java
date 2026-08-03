@@ -7,13 +7,21 @@ import java.util.UUID;
 
 public record OrderCreatedEvent(
         UUID eventId,
+        String eventType,
+        int eventVersion,
         UUID orderId,
         UUID userId,
         List<OrderCreatedItemPayload> items,
         Map<String, String> context,
         Instant occurredAt
 ) {
+    public static final String TYPE =
+            "OrderCreatedEvent";
+
+    public static final int VERSION = 1;
+
     public static OrderCreatedEvent of(
+            UUID eventId,
             UUID orderId,
             UUID userId,
             List<OrderCreatedItemPayload> items,
@@ -21,11 +29,13 @@ public record OrderCreatedEvent(
             Instant occurredAt
     ) {
         return new OrderCreatedEvent(
-                UUID.randomUUID(),
+                eventId,
+                TYPE,
+                VERSION,
                 orderId,
                 userId,
-                items,
-                context,
+                List.copyOf(items),
+                Map.copyOf(context),
                 occurredAt
         );
     }
