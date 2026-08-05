@@ -38,7 +38,6 @@ public class ReservationService {
     private final InventoryItemRepository inventoryItemRepository;
     private final Clock clock;
 
-    @Transactional
     public ReservationResult reserve(CreateReservationCommand command) {
 
         Optional<ReservationEntity> existing = reservationRepository.findByOrderId(
