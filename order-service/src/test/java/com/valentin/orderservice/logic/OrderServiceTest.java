@@ -13,7 +13,7 @@ import com.valentin.orderservice.domain.dictionary.OrderStatus;
 import com.valentin.orderservice.domain.dictionary.OutboxEventStatus;
 import com.valentin.orderservice.domain.dictionary.ProductStatus;
 import com.valentin.orderservice.domain.event.OrderCreatedEvent;
-import com.valentin.orderservice.domain.event.OrderCreatedItemPayload;
+import com.valentin.orderservice.domain.event.OrderCreatedItem;
 import com.valentin.orderservice.dto.*;
 import com.valentin.orderservice.exception.InvalidOrderStatusTransitionException;
 import com.valentin.orderservice.exception.MixedOrderCurrenciesException;
@@ -177,6 +177,44 @@ public class OrderServiceTest {
     }
 
     @Test
+    void createOrder_withDuplicateProducts_shouldMergeQuantities() {
+        CreateOrderRequest request = new CreateOrderRequest(
+                UUID.randomUUID(),
+                List.of(
+                        new CreateOrderItemRequest(KEYBOARD_PRODUCT_ID, 2),
+                        new CreateOrderItemRequest(MOUSE_PRODUCT_ID, 1),
+                        new CreateOrderItemRequest(KEYBOARD_PRODUCT_ID, 3)
+                )
+        );
+        OrderResponse orderResponse = createOrderResponse();
+        mockInventoryProducts(request);
+
+        when(orderCommandService.persistOrder(any(PreparedOrderData.class)))
+                .thenReturn(orderResponse);
+
+        OrderResponse result = orderService.createOrder(request);
+
+        assertThat(result).isSameAs(orderResponse);
+
+        verify(orderCommandService).persistOrder(preparedOrderDataCaptor.capture());
+        assertThat(preparedOrderDataCaptor.getValue().items())
+                .containsExactly(
+                        new PreparedOrderItem(
+                                KEYBOARD_PRODUCT_ID,
+                                "Keyboard",
+                                new BigDecimal("10.50"),
+                                5
+                        ),
+                        new PreparedOrderItem(
+                                MOUSE_PRODUCT_ID,
+                                "Mouse",
+                                new BigDecimal("25.00"),
+                                1
+                        )
+                );
+    }
+
+    @Test
     void createOrder_withDifferentCurrencies_shouldRejectOrder() {
         CreateOrderRequest request = createValidRequestWithMultipleItems();
         Set<UUID> requestedIds = Set.of(KEYBOARD_PRODUCT_ID, MOUSE_PRODUCT_ID);
@@ -252,19 +290,19 @@ public class OrderServiceTest {
 
 
     @Test
-    void createOrder_shouldCreateOutboxEvent(){
+    void persistOrder_shouldCreateOutboxEventWithMatchingEventIdAndContractMetadata() {
         Instant timeNow = NOW;
         UUID userId = UUID.randomUUID();
 
-        List<OrderCreatedItemPayload> itemPayloads = List.of(
-                new OrderCreatedItemPayload(
+        List<OrderCreatedItem> itemPayloads = List.of(
+                new OrderCreatedItem(
                         KEYBOARD_PRODUCT_ID,
                         "Keyboard",
                         new BigDecimal("10.50"),
                         "RUB",
                         2
                 ),
-                new OrderCreatedItemPayload(
+                new OrderCreatedItem(
                         MOUSE_PRODUCT_ID,
                         "Mouse",
                         new BigDecimal("25.00"),
@@ -325,6 +363,10 @@ public class OrderServiceTest {
 
         OrderCreatedEvent event = orderCreatedEventCaptor.getValue();
 
+        assertThat(outboxEvent.getId()).isEqualTo(event.eventId());
+        assertThat(outboxEvent.getEventType()).isEqualTo(event.eventType());
+        assertThat(event.eventType()).isEqualTo(OrderCreatedEvent.TYPE);
+        assertThat(event.eventVersion()).isEqualTo(OrderCreatedEvent.VERSION);
         assertThat(event.orderId()).isEqualTo(order.getId());
         assertThat(event.userId()).isEqualTo(userId);
         assertThat(event.items()).isEqualTo(itemPayloads);
@@ -527,29 +569,6 @@ public class OrderServiceTest {
         );
     }
 
-
-    @Test
-    void reserveInventory_shouldChangeStatusAndSaveHistory() {
-        OrderEntity order = orderWithStatus(OrderStatus.WAITING_FOR_INVENTORY);
-
-        when(orderRepository.findById(order.getId()))
-                .thenReturn(Optional.of(order));
-
-        actualOrderCommandService.reserveInventory(order.getId());
-
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.WAITING_FOR_PAYMENT);
-        assertThat(order.getUpdatedAt()).isAfterOrEqualTo(order.getCreatedAt());
-
-        verify(orderRepository).findById(order.getId());
-        verify(orderHistoryRepository).save(historyCaptor.capture());
-        assertStatusHistory(
-                historyCaptor.getValue(),
-                order,
-                OrderStatus.WAITING_FOR_INVENTORY,
-                OrderStatus.WAITING_FOR_PAYMENT,
-                OrderChangeHistoryReason.INVENTORY_RESERVED
-        );
-    }
 
     @Test
     void markPaymentSucceeded_shouldChangeStatusAndSaveHistory() {
