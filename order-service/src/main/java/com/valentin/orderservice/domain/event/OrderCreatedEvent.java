@@ -11,7 +11,7 @@ public record OrderCreatedEvent(
         int eventVersion,
         UUID orderId,
         UUID userId,
-        List<OrderCreatedItemPayload> items,
+        List<OrderCreatedItem> items,
         Map<String, String> context,
         Instant occurredAt
 ) {
@@ -24,7 +24,7 @@ public record OrderCreatedEvent(
             UUID eventId,
             UUID orderId,
             UUID userId,
-            List<OrderCreatedItemPayload> items,
+            List<OrderCreatedItem> items,
             Map<String, String> context,
             Instant occurredAt
     ) {

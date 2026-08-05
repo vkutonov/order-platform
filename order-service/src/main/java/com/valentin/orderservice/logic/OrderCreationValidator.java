@@ -70,20 +70,30 @@ public class OrderCreationValidator {
         String currency =
                 currencies.iterator().next();
 
-        List<PreparedOrderItem> preparedItems =
+        Map<UUID, Integer> quantitiesByProductId =
                 request.items()
                         .stream()
-                        .map(requestItem -> {
+                        .collect(Collectors.toMap(
+                                CreateOrderItemRequest::productId,
+                                CreateOrderItemRequest::quantity,
+                                Integer::sum,
+                                LinkedHashMap::new
+                        ));
+
+        List<PreparedOrderItem> preparedItems =
+                quantitiesByProductId.entrySet()
+                        .stream()
+                        .map(entry -> {
                             ProductSnapshot product =
                                     productsById.get(
-                                            requestItem.productId()
+                                            entry.getKey()
                                     );
 
                             return new PreparedOrderItem(
                                     product.productId(),
                                     product.productName(),
                                     product.unitPrice(),
-                                    requestItem.quantity()
+                                    entry.getValue()
                             );
                         })
                         .toList();

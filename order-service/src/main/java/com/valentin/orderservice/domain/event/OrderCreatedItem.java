@@ -3,7 +3,7 @@ package com.valentin.orderservice.domain.event;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-public record OrderCreatedItemPayload(
+public record OrderCreatedItem(
         UUID productId,
         String productName,
         BigDecimal unitPrice,
