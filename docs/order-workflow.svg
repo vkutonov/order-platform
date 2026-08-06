@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980">
+<defs>
+  <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+    <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
+  </marker>
+  <marker id="arrowMuted" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+    <path d="M0,0 L0,6 L9,3 z" fill="#64748B"/>
+  </marker>
+  <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+    <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.10"/>
+  </filter>
+</defs>
+<rect width="100%" height="100%" fill="#F8FAFC"/>
+<rect x="32" y="28" width="1536" height="924" rx="24" fill="#FFFFFF" stroke="#E2E8F0" filter="url(#shadow)"/>
+<text x="80" y="88" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="32" font-weight="700" fill="#0F172A">Workflow обработки заказа</text>
+<text x="80" y="124" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" fill="#64748B">Synchronous product validation + asynchronous inventory reservation</text>
+
+<rect x="75.0" y="160" width="150" height="58" rx="14" fill="#EEF2FF" stroke="#4F46E5" stroke-width="2"/>
+<text x="150" y="196" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="700" fill="#0F172A">Client</text>
+<line x1="150" y1="218" x2="150" y2="900" stroke="#CBD5E1" stroke-width="2" stroke-dasharray="8 8"/>
+<rect x="330.0" y="160" width="180" height="58" rx="14" fill="#ECFDF5" stroke="#059669" stroke-width="2"/>
+<text x="420" y="196" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="700" fill="#0F172A">order-service</text>
+<line x1="420" y1="218" x2="420" y2="900" stroke="#CBD5E1" stroke-width="2" stroke-dasharray="8 8"/>
+<rect x="600.0" y="160" width="180" height="58" rx="14" fill="#F0FDFA" stroke="#0F766E" stroke-width="2"/>
+<text x="690" y="196" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="700" fill="#0F172A">order_db</text>
+<line x1="690" y1="218" x2="690" y2="900" stroke="#CBD5E1" stroke-width="2" stroke-dasharray="8 8"/>
+<rect x="885.0" y="160" width="150" height="58" rx="14" fill="#FFF7ED" stroke="#EA580C" stroke-width="2"/>
+<text x="960" y="196" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="700" fill="#0F172A">Kafka</text>
+<line x1="960" y1="218" x2="960" y2="900" stroke="#CBD5E1" stroke-width="2" stroke-dasharray="8 8"/>
+<rect x="1125.0" y="160" width="210" height="58" rx="14" fill="#EFF6FF" stroke="#2563EB" stroke-width="2"/>
+<text x="1230" y="196" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="700" fill="#0F172A">inventory-service</text>
+<line x1="1230" y1="218" x2="1230" y2="900" stroke="#CBD5E1" stroke-width="2" stroke-dasharray="8 8"/>
+<rect x="1390.0" y="160" width="180" height="58" rx="14" fill="#F5F3FF" stroke="#7C3AED" stroke-width="2"/>
+<text x="1480" y="196" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="700" fill="#0F172A">inventory_db</text>
+<line x1="1480" y1="218" x2="1480" y2="900" stroke="#CBD5E1" stroke-width="2" stroke-dasharray="8 8"/>
+<circle cx="72" cy="270" r="15" fill="#4F46E5"/>
+<text x="72" y="275" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" fill="#FFFFFF">1</text>
+<line x1="150" y1="270" x2="420" y2="270" stroke="#334155" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="110.0" y="239" width="350" height="24" rx="8" fill="#FFFFFF" opacity="0.95"/>
+<text x="285.0" y="256" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="600" fill="#334155">POST /api/orders</text>
+<circle cx="72" cy="350" r="15" fill="#059669"/>
+<text x="72" y="355" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" fill="#FFFFFF">2</text>
+<line x1="420" y1="350" x2="1230" y2="350" stroke="#334155" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="650.0" y="319" width="350" height="24" rx="8" fill="#FFFFFF" opacity="0.95"/>
+<text x="825.0" y="336" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="600" fill="#334155">POST /internal/products/batch</text>
+<circle cx="72" cy="430" r="15" fill="#2563EB"/>
+<text x="72" y="435" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" fill="#FFFFFF">3</text>
+<line x1="1230" y1="430" x2="420" y2="430" stroke="#64748B" stroke-width="2.5" stroke-dasharray="8 7" marker-end="url(#arrowMuted)"/>
+<rect x="650.0" y="399" width="350" height="24" rx="8" fill="#FFFFFF" opacity="0.95"/>
+<text x="825.0" y="416" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="600" fill="#334155">Product snapshots</text>
+<circle cx="72" cy="510" r="15" fill="#0F766E"/>
+<text x="72" y="515" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" fill="#FFFFFF">4</text>
+<line x1="420" y1="510" x2="690" y2="510" stroke="#334155" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="380.0" y="479" width="350" height="24" rx="8" fill="#FFFFFF" opacity="0.95"/>
+<text x="555.0" y="496" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="600" fill="#334155">Order + OrderCreatedEvent → outbox</text>
+<circle cx="72" cy="590" r="15" fill="#059669"/>
+<text x="72" y="595" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" fill="#FFFFFF">5</text>
+<line x1="690" y1="590" x2="420" y2="590" stroke="#64748B" stroke-width="2.5" stroke-dasharray="8 7" marker-end="url(#arrowMuted)"/>
+<rect x="380.0" y="559" width="350" height="24" rx="8" fill="#FFFFFF" opacity="0.95"/>
+<text x="555.0" y="576" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="600" fill="#334155">COMMIT</text>
+<circle cx="72" cy="670" r="15" fill="#4F46E5"/>
+<text x="72" y="675" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" fill="#FFFFFF">6</text>
+<line x1="420" y1="670" x2="150" y2="670" stroke="#64748B" stroke-width="2.5" stroke-dasharray="8 7" marker-end="url(#arrowMuted)"/>
+<rect x="110.0" y="639" width="350" height="24" rx="8" fill="#FFFFFF" opacity="0.95"/>
+<text x="285.0" y="656" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="600" fill="#334155">201 Created</text>
+<circle cx="72" cy="750" r="15" fill="#EA580C"/>
+<text x="72" y="755" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" fill="#FFFFFF">7</text>
+<line x1="420" y1="750" x2="960" y2="750" stroke="#334155" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="515.0" y="719" width="350" height="24" rx="8" fill="#FFFFFF" opacity="0.95"/>
+<text x="690.0" y="736" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="600" fill="#334155">Outbox Publisher → OrderCreatedEvent</text>
+<circle cx="72" cy="830" r="15" fill="#2563EB"/>
+<text x="72" y="835" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" fill="#FFFFFF">8</text>
+<line x1="960" y1="830" x2="1230" y2="830" stroke="#334155" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="920.0" y="799" width="350" height="24" rx="8" fill="#FFFFFF" opacity="0.95"/>
+<text x="1095.0" y="816" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="600" fill="#334155">Deliver event</text>
+<rect x="1180" y="855" width="360" height="72" rx="14" fill="#F8FAFC" stroke="#7C3AED" stroke-width="2"/>
+<text x="1360" y="882" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" fill="#6D28D9">Одна локальная транзакция</text>
+<text x="1360" y="907" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" fill="#334155">Inbox + reservation + stock update + result outbox</text>
+<line x1="1230" y1="890" x2="1480" y2="890" stroke="#7C3AED" stroke-width="2.5" marker-end="url(#arrow)"/>
+<text x="80" y="930" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" fill="#94A3B8">Kafka delivery: at-least-once · Business effect: effectively-once through Inbox Pattern</text>
+</svg>
