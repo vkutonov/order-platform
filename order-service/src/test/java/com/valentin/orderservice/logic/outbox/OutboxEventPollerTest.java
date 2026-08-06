@@ -58,6 +58,7 @@ public class OutboxEventPollerTest {
         Instant expectedThreshold = Instant.parse("2026-07-13T11:59:00Z");
 
         OutboxEventEntity event = OutboxEventEntity.create(
+                UUID.randomUUID(),
                 "Order",
                 UUID.randomUUID(),
                 "OrderCreatedEvent",
@@ -127,6 +128,7 @@ public class OutboxEventPollerTest {
 
     private OutboxEventEntity event() {
         return OutboxEventEntity.create(
+                UUID.randomUUID(),
                 "Order",
                 UUID.randomUUID(),
                 "OrderCreatedEvent",

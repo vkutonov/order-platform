@@ -62,6 +62,7 @@ class OutboxKafkaPublisherTest {
 
     private OutboxEventEntity event() {
         return OutboxEventEntity.create(
+                UUID.randomUUID(),
                 "Order",
                 UUID.randomUUID(),
                 "OrderCreatedEvent",

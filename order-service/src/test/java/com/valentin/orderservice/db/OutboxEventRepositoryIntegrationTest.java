@@ -150,6 +150,8 @@ class OutboxEventRepositoryIntegrationTest {
     }
 
     private OutboxEventEntity createEvent(UUID aggregateId, Instant createdAt) {
+        UUID eventId = UUID.randomUUID();
+
         String payload = """
                 {
                   "eventId": "%s",
@@ -159,9 +161,10 @@ class OutboxEventRepositoryIntegrationTest {
                   },
                   "occurredAt": "%s"
                 }
-                """.formatted(UUID.randomUUID(), aggregateId, createdAt);
+                """.formatted(eventId, aggregateId, createdAt);
 
         return OutboxEventEntity.create(
+                eventId,
                 "Order",
                 aggregateId,
                 "OrderCreatedEvent",

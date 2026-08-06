@@ -5,9 +5,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.JdbcType;
 import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
@@ -20,8 +18,6 @@ import java.util.UUID;
 public class OutboxEventEntity {
 
     @Id
-    @UuidGenerator
-    @GeneratedValue
     @Column(nullable = false, updatable = false)
     private UUID id;
 
@@ -56,6 +52,7 @@ public class OutboxEventEntity {
 
 
     public static OutboxEventEntity create(
+            UUID eventId,
             String aggregateType,
             UUID aggregateId,
             String eventType,
@@ -63,6 +60,7 @@ public class OutboxEventEntity {
             Instant createdAt
     ) {
         OutboxEventEntity event = new OutboxEventEntity();
+        event.id = eventId;
         event.aggregateType = aggregateType;
         event.aggregateId = aggregateId;
         event.eventType = eventType;

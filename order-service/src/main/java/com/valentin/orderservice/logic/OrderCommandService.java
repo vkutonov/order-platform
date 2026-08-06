@@ -89,9 +89,12 @@ public class OrderCommandService {
 
         orderHistoryRepository.save(orderStatusHistory);
 
+        UUID eventId = UUID.randomUUID();
+
         OrderCreatedEvent orderCreatedEvent = OrderCreatedEvent.of(
+                eventId,
                 saved.getId(),
-                order.getUserId(),
+                saved.getUserId(),
                 mapper.toItemsPayload(order.getOrderItems()),
                 Map.of("source", "order-service"),
                 timeNow
@@ -99,6 +102,7 @@ public class OrderCommandService {
 
 
         OutboxEventEntity outboxEvent = OutboxEventEntity.create(
+                eventId,
                 "Order",
                 saved.getId(),
                 "OrderCreatedEvent",
