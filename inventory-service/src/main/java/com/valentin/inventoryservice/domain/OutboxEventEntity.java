@@ -4,7 +4,9 @@ import com.valentin.inventoryservice.domain.dictionary.OutboxEventStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -14,9 +16,11 @@ import java.util.UUID;
 @Getter
 @Entity
 @Table(name = "outbox_events")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OutboxEventEntity {
 
     @Id
+    @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
 
     @Size(max = 100)
@@ -83,6 +87,7 @@ public class OutboxEventEntity {
 
     public void markNewAfterFailure(String errorMessage) {
         this.status = OutboxEventStatus.NEW;
+        this.processedAt = null;
         this.errorMessage = errorMessage;
     }
 }
