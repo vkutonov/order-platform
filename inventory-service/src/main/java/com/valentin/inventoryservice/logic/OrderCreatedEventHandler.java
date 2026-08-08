@@ -23,7 +23,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OrderCreatedEventHandler {
 
-    private static final String RESERVATION_AGGREGATE_TYPE = "Reservation";
+    private static final String ORDER_AGGREGATE_TYPE = "Order";
 
     private final ReservationService reservationService;
     private final ProcessedEventsRepository processedEventsRepository;
@@ -62,8 +62,8 @@ public class OrderCreatedEventHandler {
 
             outboxEvent = OutboxEventEntity.create(
                     eventId,
-                    RESERVATION_AGGREGATE_TYPE,
-                    result.reservationId(),
+                    ORDER_AGGREGATE_TYPE,
+                    result.orderId(),
                     reservedEvent.eventType(),
                     objectMapper.writeValueAsString(reservedEvent),
                     now
@@ -79,8 +79,8 @@ public class OrderCreatedEventHandler {
 
             outboxEvent = OutboxEventEntity.create(
                     eventId,
-                    RESERVATION_AGGREGATE_TYPE,
-                    result.reservationId(),
+                    ORDER_AGGREGATE_TYPE,
+                    result.orderId(),
                     failedEvent.eventType(),
                     objectMapper.writeValueAsString(failedEvent),
                     now

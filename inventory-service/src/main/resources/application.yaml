@@ -41,6 +41,7 @@ spring:
       max-poll-records: 50
 
     producer:
+      client-id: inventory-service-outbox-producer
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
@@ -59,6 +60,13 @@ app:
     topics:
       order-events: order.events
       order-events-dlt: order.events.inventory-service.dlt
+      inventory-events: inventory.events
+
+  outbox:
+    polling:
+      batch-size: 50
+      fixed-delay-ms: 5000
+      processing-timeout-ms: 60000
 
 logging:
   level:
