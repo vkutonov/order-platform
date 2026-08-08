@@ -1,7 +1,13 @@
 package com.valentin.inventoryservice.logic;
 
+import com.valentin.inventoryservice.db.InventoryItemRepository;
+import com.valentin.inventoryservice.db.OutboxEventRepository;
 import com.valentin.inventoryservice.db.ProcessedEventsRepository;
+import com.valentin.inventoryservice.db.ProductRepository;
 import com.valentin.inventoryservice.db.ReservationRepository;
+import com.valentin.inventoryservice.domain.InventoryItemEntity;
+import com.valentin.inventoryservice.domain.ProductEntity;
+import com.valentin.inventoryservice.domain.dictionary.ProductStatus;
 import com.valentin.inventoryservice.exception.ProductNotFoundException;
 import com.valentin.inventoryservice.messaging.event.OrderCreatedEvent;
 import com.valentin.inventoryservice.messaging.event.OrderCreatedItem;
@@ -10,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -23,6 +30,9 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = "server.port=0")
 @Testcontainers
@@ -62,9 +72,18 @@ class OrderCreatedEventHandlerIntegrationTest {
     @Autowired
     private ReservationRepository reservationRepository;
 
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private InventoryItemRepository inventoryItemRepository;
+
+    @MockitoBean
+    private OutboxEventRepository outboxEventRepository;
+
     @Test
     void handle_whenReservationFails_shouldRollbackProcessedEvent() {
-        OrderCreatedEvent event = event();
+        OrderCreatedEvent event = event(MISSING_PRODUCT_ID);
 
         assertThatThrownBy(() -> handler.handle(event))
                 .isInstanceOf(ProductNotFoundException.class);
@@ -73,7 +92,44 @@ class OrderCreatedEventHandlerIntegrationTest {
         assertThat(reservationRepository.count()).isZero();
     }
 
-    private OrderCreatedEvent event() {
+    @Test
+    void handle_whenOutboxSaveFails_shouldRollbackWholeTransaction() {
+        ProductEntity product = productRepository.saveAndFlush(ProductEntity.create(
+                "Keyboard",
+                "Mechanical keyboard",
+                new BigDecimal("5000.00"),
+                "RUB",
+                ProductStatus.ACTIVE,
+                Instant.parse("2026-08-05T09:00:00Z")
+        ));
+
+        inventoryItemRepository.saveAndFlush(InventoryItemEntity.create(
+                product.getId(),
+                10,
+                Instant.parse("2026-08-05T09:00:00Z")
+        ));
+
+        OrderCreatedEvent event = event(product.getId());
+
+        when(outboxEventRepository.save(any()))
+                .thenThrow(new RuntimeException("Outbox save failed"));
+
+        assertThatThrownBy(() -> handler.handle(event))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Outbox save failed");
+
+        assertThat(processedEventsRepository.existsById(EVENT_ID)).isFalse();
+        assertThat(reservationRepository.findByOrderId(ORDER_ID)).isEmpty();
+        assertThat(inventoryItemRepository.findByProductId(product.getId()))
+                .get()
+                .satisfies(inventoryItem -> {
+                    assertThat(inventoryItem.getQuantityOnHand()).isEqualTo(10);
+                    assertThat(inventoryItem.getReservedQuantity()).isZero();
+                });
+        verify(outboxEventRepository).save(any());
+    }
+
+    private OrderCreatedEvent event(UUID productId) {
         return new OrderCreatedEvent(
                 EVENT_ID,
                 "OrderCreatedEvent",
@@ -81,8 +137,8 @@ class OrderCreatedEventHandlerIntegrationTest {
                 ORDER_ID,
                 USER_ID,
                 List.of(new OrderCreatedItem(
-                        MISSING_PRODUCT_ID,
-                        "Missing product",
+                        productId,
+                        "Keyboard",
                         new BigDecimal("5000.00"),
                         "RUB",
                         1
