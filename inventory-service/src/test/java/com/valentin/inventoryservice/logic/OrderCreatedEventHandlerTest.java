@@ -126,8 +126,8 @@ class OrderCreatedEventHandlerTest {
         assertThat(resultEvent.orderId()).isEqualTo(ORDER_ID);
         assertThat(resultEvent.reservationId()).isEqualTo(RESERVATION_ID);
         assertThat(resultEvent.occurredAt()).isEqualTo(NOW);
-        assertThat(outboxEvent.getAggregateType()).isEqualTo("Reservation");
-        assertThat(outboxEvent.getAggregateId()).isEqualTo(RESERVATION_ID);
+        assertThat(outboxEvent.getAggregateType()).isEqualTo("Order");
+        assertThat(outboxEvent.getAggregateId()).isEqualTo(ORDER_ID);
         assertThat(outboxEvent.getEventType()).isEqualTo(InventoryReservedEvent.TYPE);
         assertThat(outboxEvent.getPayload()).isEqualTo(payload);
         assertThat(outboxEvent.getStatus()).isEqualTo(OutboxEventStatus.NEW);
@@ -171,8 +171,8 @@ class OrderCreatedEventHandlerTest {
         assertThat(resultEvent.reservationId()).isEqualTo(RESERVATION_ID);
         assertThat(resultEvent.failureCode()).isEqualTo(ReservationFailureCode.INSUFFICIENT_STOCK);
         assertThat(resultEvent.occurredAt()).isEqualTo(NOW);
-        assertThat(outboxEvent.getAggregateType()).isEqualTo("Reservation");
-        assertThat(outboxEvent.getAggregateId()).isEqualTo(RESERVATION_ID);
+        assertThat(outboxEvent.getAggregateType()).isEqualTo("Order");
+        assertThat(outboxEvent.getAggregateId()).isEqualTo(ORDER_ID);
         assertThat(outboxEvent.getEventType()).isEqualTo(InventoryReservationFailedEvent.TYPE);
         assertThat(outboxEvent.getPayload()).isEqualTo(payload);
         assertThat(outboxEvent.getStatus()).isEqualTo(OutboxEventStatus.NEW);
