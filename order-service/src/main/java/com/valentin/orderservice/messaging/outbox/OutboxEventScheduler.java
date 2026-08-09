@@ -1,4 +1,4 @@
-package com.valentin.orderservice.logic.outbox;
+package com.valentin.orderservice.messaging.outbox;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

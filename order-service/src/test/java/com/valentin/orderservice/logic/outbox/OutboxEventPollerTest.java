@@ -1,6 +1,9 @@
 package com.valentin.orderservice.logic.outbox;
 
 import com.valentin.orderservice.domain.OutboxEventEntity;
+import com.valentin.orderservice.messaging.outbox.OutboxEventPoller;
+import com.valentin.orderservice.messaging.outbox.OutboxEventService;
+import com.valentin.orderservice.messaging.outbox.OutboxKafkaPublisher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

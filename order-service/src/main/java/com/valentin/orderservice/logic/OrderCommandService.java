@@ -9,7 +9,7 @@ import com.valentin.orderservice.domain.OrderItemEntity;
 import com.valentin.orderservice.domain.OutboxEventEntity;
 import com.valentin.orderservice.domain.dictionary.OrderChangeHistoryReason;
 import com.valentin.orderservice.domain.dictionary.OrderStatus;
-import com.valentin.orderservice.domain.event.OrderCreatedEvent;
+import com.valentin.orderservice.messaging.event.OrderCreatedEvent;
 import com.valentin.orderservice.dto.*;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.mapper.OrderMapper;
