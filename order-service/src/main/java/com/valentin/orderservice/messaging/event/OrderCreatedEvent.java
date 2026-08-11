@@ -1,4 +1,4 @@
-package com.valentin.orderservice.domain.event;
+package com.valentin.orderservice.messaging.event;
 
 import java.time.Instant;
 import java.util.List;

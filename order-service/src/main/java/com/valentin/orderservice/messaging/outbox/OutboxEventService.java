@@ -1,4 +1,4 @@
-package com.valentin.orderservice.logic.outbox;
+package com.valentin.orderservice.messaging.outbox;
 
 import com.valentin.orderservice.db.OutboxEventRepository;
 import com.valentin.orderservice.domain.OutboxEventEntity;

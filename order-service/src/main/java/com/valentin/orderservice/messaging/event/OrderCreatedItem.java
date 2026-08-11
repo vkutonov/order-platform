@@ -1,4 +1,4 @@
-package com.valentin.orderservice.domain.event;
+package com.valentin.orderservice.messaging.event;
 
 import java.math.BigDecimal;
 import java.util.UUID;

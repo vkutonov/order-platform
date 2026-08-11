@@ -4,7 +4,7 @@ package com.valentin.orderservice.mapper;
 import com.valentin.orderservice.domain.OrderEntity;
 import com.valentin.orderservice.domain.OrderHistoryEntity;
 import com.valentin.orderservice.domain.OrderItemEntity;
-import com.valentin.orderservice.domain.event.OrderCreatedItem;
+import com.valentin.orderservice.messaging.event.OrderCreatedItem;
 import com.valentin.orderservice.dto.*;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

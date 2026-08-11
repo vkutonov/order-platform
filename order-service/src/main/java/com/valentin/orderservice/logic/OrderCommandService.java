@@ -9,7 +9,8 @@ import com.valentin.orderservice.domain.OrderItemEntity;
 import com.valentin.orderservice.domain.OutboxEventEntity;
 import com.valentin.orderservice.domain.dictionary.OrderChangeHistoryReason;
 import com.valentin.orderservice.domain.dictionary.OrderStatus;
-import com.valentin.orderservice.domain.event.OrderCreatedEvent;
+import com.valentin.orderservice.domain.dictionary.ReservationFailureCode;
+import com.valentin.orderservice.messaging.event.OrderCreatedEvent;
 import com.valentin.orderservice.dto.*;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.mapper.OrderMapper;
@@ -151,7 +152,7 @@ public class OrderCommandService {
     }
 
     @Transactional
-    public void inventoryReservationFailed(UUID orderId) {
+    public void inventoryReservationFailed(UUID orderId, ReservationFailureCode failureCode) {
         OrderEntity order = findOrder(orderId);
         Instant timeNow = clock.instant();
 
@@ -159,17 +160,28 @@ public class OrderCommandService {
 
         order.markInventoryReservationFailed(timeNow);
 
-        saveStatusHistory(
-                order,
-                oldStatus,
-                order.getStatus(),
-                OrderChangeHistoryReason.INVENTORY_RESERVATION_FAILED,
-                timeNow
-        );
+        switch (failureCode) {
+            case INSUFFICIENT_STOCK ->  saveStatusHistory(
+                        order,
+                        oldStatus,
+                        order.getStatus(),
+                        OrderChangeHistoryReason.INVENTORY_INSUFFICIENT_STOCK,
+                        timeNow
+                );
 
+            case PRODUCT_INACTIVE -> saveStatusHistory(
+                    order,
+                    oldStatus,
+                    order.getStatus(),
+                    OrderChangeHistoryReason.INVENTORY_PRODUCT_INACTIVE,
+                    timeNow
+            );
+
+}
         log.info(
-                "Order inventory reservation failed: orderId={}, oldStatus={}, newStatus={}",
+                "Order inventory reservation failed: orderId={}, failureCode={}, oldStatus={}, newStatus={}",
                 orderId,
+                failureCode,
                 oldStatus,
                 order.getStatus()
         );

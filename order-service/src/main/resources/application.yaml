@@ -46,11 +46,27 @@ spring:
       properties:
         "[enable.idempotence]": true
 
+    consumer:
+      group-id: order-inventory-reservation-v1
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      max-poll-records: 50
+
+
+    listener:
+      type: single
+      ack-mode: batch
+      concurrency: 1
 
 app:
   kafka:
     topics:
       order-events: order.events
+      inventory-events: inventory.events
+      inventory-events-dlt: inventory.events.order-service.dlt
 
   outbox:
     polling:
