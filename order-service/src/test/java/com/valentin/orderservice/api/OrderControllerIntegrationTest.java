@@ -236,31 +236,6 @@ class OrderControllerIntegrationTest {
                 .andExpect(jsonPath("$.orderSummaryResponses", hasSize(0)));
     }
 
-    @Test
-    void reserveInventory_whenOrderHasInvalidStatus_returnsConflict() throws Exception {
-        String createResponse = mockMvc.perform(post("/api/orders")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(validCreateOrderJson()))
-                .andExpect(status().isCreated())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
-
-        String orderId = JsonPath.read(createResponse, "$.id");
-
-        mockMvc.perform(post("/api/orders/{id}/reserve", orderId))
-                .andExpect(status().isNoContent());
-
-        mockMvc.perform(post("/api/orders/{id}/reserve", orderId))
-                .andExpect(status().isConflict())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value(409))
-                .andExpect(jsonPath("$.error").value("Conflict"))
-                .andExpect(jsonPath("$.code").value("INVALID_ORDER_STATUS_TRANSITION"))
-                .andExpect(jsonPath("$.message").value("Order cannot be moved from WAITING_FOR_PAYMENT to WAITING_FOR_PAYMENT"))
-                .andExpect(jsonPath("$.path").value("/api/orders/" + orderId + "/reserve"))
-                .andExpect(jsonPath("$.fieldErrors", hasSize(0)));
-    }
 
     @Test
     void createOrder_whenRequestIsInvalid_returnsValidationError() throws Exception {

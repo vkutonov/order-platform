@@ -1,19 +1,25 @@
 package com.valentin.orderservice.logic;
 
+import com.valentin.orderservice.config.TimeConfig;
 import com.valentin.orderservice.db.OrderHistoryRepository;
 import com.valentin.orderservice.db.OrderRepository;
 import com.valentin.orderservice.domain.dictionary.OrderChangeHistoryReason;
 import com.valentin.orderservice.domain.OrderEntity;
 import com.valentin.orderservice.domain.OrderHistoryEntity;
 import com.valentin.orderservice.domain.dictionary.OrderStatus;
+import com.valentin.orderservice.mapper.OrderMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
 import java.util.ArrayList;
@@ -22,7 +28,14 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
+@DataJpaTest
+@AutoConfigureTestDatabase(
+        replace = AutoConfigureTestDatabase.Replace.NONE
+)
+@Import({
+        OrderCommandService.class,
+        TimeConfig.class
+})
 @Testcontainers
 public class OrderCommandServiceIntegrationTest {
 
@@ -49,6 +62,12 @@ public class OrderCommandServiceIntegrationTest {
 
     @Autowired
     private OrderCommandService orderCommandService;
+
+    @MockitoBean
+    private OrderMapper orderMapper;
+
+    @MockitoBean
+    private ObjectMapper objectMapper;
 
     @Test
     void reserveInventory_shouldUpdateOrderAndSaveHistory() {
