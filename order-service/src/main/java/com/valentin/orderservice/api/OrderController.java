@@ -56,18 +56,6 @@ public class OrderController {
     // Temporary endpoints for simulating Service events.
     // Will be replaced by Kafka consumer.
 
-    @PostMapping("/{id}/reserve")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void reserveInventory(@PathVariable UUID id) {
-        orderCommandService.reserveInventory(id);
-    }
-
-    @PostMapping("/{id}/inventory-failed")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void inventoryReservationFailed(@PathVariable UUID id) {
-        orderCommandService.inventoryReservationFailed(id);
-    }
-
     @PostMapping("/{id}/payment-success")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void confirmPayment(@PathVariable UUID id) {
