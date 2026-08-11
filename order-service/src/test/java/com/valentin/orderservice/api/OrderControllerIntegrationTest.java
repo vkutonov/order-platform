@@ -7,6 +7,7 @@ import com.valentin.orderservice.db.OrderHistoryRepository;
 import com.valentin.orderservice.domain.dictionary.ProductStatus;
 import com.valentin.orderservice.dto.ProductSnapshot;
 import com.valentin.orderservice.dto.ProductsBatchRequest;
+import com.valentin.orderservice.messaging.outbox.OutboxEventPoller;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = "spring.kafka.listener.auto-startup=false")
 @AutoConfigureMockMvc
 @Testcontainers
 class OrderControllerIntegrationTest {
@@ -63,6 +64,9 @@ class OrderControllerIntegrationTest {
 
     @MockitoBean
     InventoryClient inventoryClient;
+
+    @MockitoBean
+    OutboxEventPoller poller;
 
     @DynamicPropertySource
     static void configurePostgres(DynamicPropertyRegistry registry) {
