@@ -1,0 +1,14 @@
+.git
+.idea
+.gitignore
+
+.github/
+.agents/
+.gradle/
+**/build/
+docs/
+
+.env
+README.md
+
+*.iml
