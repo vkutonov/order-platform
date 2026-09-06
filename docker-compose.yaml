@@ -1,4 +1,35 @@
 services:
+  order-service:
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+
+    image:
+      order-service:local
+
+    ports:
+      - "127.0.0.1:${ORDER_SERVICE_PORT}:8081"
+
+    environment:
+      ORDER_DB_HOST: order-postgres
+      ORDER_DB_PORT: 5432
+      ORDER_DB_NAME: ${ORDER_DB_NAME}
+      ORDER_DB_USERNAME: ${ORDER_DB_USERNAME}
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD}
+
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+
+      INVENTORY_SERVICE_URL: http://inventory-service:8082
+
+    depends_on:
+      order-postgres:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+
+    security_opt:
+      - no-new-privileges:true
+
   order-postgres:
     image: postgres:18.4-bookworm
     container_name: order-postgres

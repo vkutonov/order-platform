@@ -1,6 +1,6 @@
 .git
 .idea
-.gitignore
+order-service/.gitignore
 
 .github/
 .agents/

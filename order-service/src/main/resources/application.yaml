@@ -38,7 +38,7 @@ spring:
 
   kafka:
 
-    bootstrap-servers: localhost:${KAFKA_EXTERNAL_PORT}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       client-id: order-service-outbox-producer
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
