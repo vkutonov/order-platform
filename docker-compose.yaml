@@ -4,8 +4,7 @@ services:
       context: .
       dockerfile: order-service/Dockerfile
 
-    image:
-      order-service:local
+    image: order-service:local
 
     ports:
       - "127.0.0.1:${ORDER_SERVICE_PORT}:8081"
@@ -29,6 +28,35 @@ services:
 
     security_opt:
       - no-new-privileges:true
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: inventory-service/Dockerfile
+
+    image: inventory-service:local
+
+    ports:
+      - "127.0.0.1:${INVENTORY_SERVICE_PORT}:8082"
+
+    environment:
+      INVENTORY_DB_HOST: inventory-postgres
+      INVENTORY_DB_PORT: 5432
+      INVENTORY_DB_NAME: ${INVENTORY_DB_NAME}
+      INVENTORY_DB_USERNAME: ${INVENTORY_DB_USERNAME}
+      INVENTORY_DB_PASSWORD: ${INVENTORY_DB_PASSWORD}
+
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+
+    depends_on:
+      inventory-postgres:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+
+    security_opt:
+      - no-new-privileges:true
+
 
   order-postgres:
     image: postgres:18.4-bookworm
