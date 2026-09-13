@@ -29,6 +29,9 @@ services:
     security_opt:
       - no-new-privileges:true
 
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+
   inventory-service:
     build:
       context: .
@@ -56,6 +59,9 @@ services:
 
     security_opt:
       - no-new-privileges:true
+
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8082/actuator/health" ]
 
 
   order-postgres:
