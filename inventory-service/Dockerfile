@@ -4,7 +4,7 @@ FROM eclipse-temurin:21-jdk-jammy AS builder
 
 WORKDIR /workspace
 
-COPY gradlew .
+COPY --chmod=755 gradlew ./gradlew
 COPY gradle gradle
 
 COPY settings.gradle build.gradle ./
@@ -35,7 +35,6 @@ RUN groupadd --system app \
 COPY --from=builder --chmod=0444 \
     /workspace/inventory-service/build/libs/*.jar \
     app.jar
-
 
 USER app
 

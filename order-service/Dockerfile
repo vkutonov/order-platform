@@ -4,7 +4,7 @@ FROM eclipse-temurin:21-jdk-jammy AS builder
 
 WORKDIR /workspace
 
-COPY gradlew .
+COPY --chmod=755 gradlew ./gradlew
 COPY gradle gradle
 
 COPY settings.gradle build.gradle ./
