@@ -7,7 +7,7 @@ GRADLE := ./gradlew
 
 SERVICE ?=
 
-.PHONY: help config build up up-build down ps logs restart rebuild test reset
+.PHONY: help config build up up-build ci-up-build down ps logs restart rebuild test reset
 
 
 help:
@@ -46,6 +46,8 @@ up: .env
 up-build: .env
 	$(COMPOSE) up -d --build
 
+ci-up-build: .env
+	$(COMPOSE) up -d --wait --wait-timeout 120 --build order-service inventory-service
 
 down:
 	$(COMPOSE) down
@@ -71,7 +73,7 @@ rebuild:
 
 
 test:
-	$(GRADLE) clean build --no-daemon
+	$(GRADLE) build --no-daemon
 
 
 reset: .env

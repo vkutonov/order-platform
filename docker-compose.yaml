@@ -31,6 +31,9 @@ services:
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   inventory-service:
     build:
@@ -62,6 +65,9 @@ services:
 
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8082/actuator/health" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 
   order-postgres:
