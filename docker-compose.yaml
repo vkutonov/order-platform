@@ -1,4 +1,75 @@
 services:
+  order-service:
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+
+    image: order-service:local
+
+    ports:
+      - "127.0.0.1:${ORDER_SERVICE_PORT}:8081"
+
+    environment:
+      ORDER_DB_HOST: order-postgres
+      ORDER_DB_PORT: 5432
+      ORDER_DB_NAME: ${ORDER_DB_NAME}
+      ORDER_DB_USERNAME: ${ORDER_DB_USERNAME}
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD}
+
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+
+      INVENTORY_SERVICE_URL: http://inventory-service:8082
+
+    depends_on:
+      order-postgres:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+
+    security_opt:
+      - no-new-privileges:true
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: inventory-service/Dockerfile
+
+    image: inventory-service:local
+
+    ports:
+      - "127.0.0.1:${INVENTORY_SERVICE_PORT}:8082"
+
+    environment:
+      INVENTORY_DB_HOST: inventory-postgres
+      INVENTORY_DB_PORT: 5432
+      INVENTORY_DB_NAME: ${INVENTORY_DB_NAME}
+      INVENTORY_DB_USERNAME: ${INVENTORY_DB_USERNAME}
+      INVENTORY_DB_PASSWORD: ${INVENTORY_DB_PASSWORD}
+
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+
+    depends_on:
+      inventory-postgres:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+
+    security_opt:
+      - no-new-privileges:true
+
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8082/actuator/health" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+
   order-postgres:
     image: postgres:18.4-bookworm
     container_name: order-postgres

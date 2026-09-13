@@ -37,18 +37,15 @@ Java 21 · Spring Boot · PostgreSQL · Apache Kafka · Transactional Outbox · 
   </tbody>
 </table>
 
-## Workflow обработки заказа
+## Архитектура
 
 <p align="center">
-  <img src="docs/order-workflow.svg" alt="Order processing workflow" width="100%">
+  <img src="docs/architecture.svg" alt="Order Platform architecture" width="100%">
 </p>
 
-1. Клиент отправляет запрос на создание заказа.
-2. `order-service` получает из `inventory-service` актуальные product snapshots.
-3. После валидации заказ и `OrderCreatedEvent` сохраняются в одной транзакции.
-4. Outbox Publisher асинхронно публикует событие в Kafka.
-5. `inventory-service` идемпотентно обрабатывает событие и резервирует товары.
-6. Inbox-запись, резервация, изменение остатков и result event сохраняются атомарно.
+- Клиент обращается к публичному REST API сервисов.
+- `order-service` запрашивает у `inventory-service` product snapshots по HTTP.
+- Сервисы обмениваются доменными событиями через Kafka и не используют общую базу данных.
 
 ## Сильные стороны
 
@@ -206,20 +203,57 @@ REST API возвращает единый error response со стабильн�
 
 ## Technology Stack
 
-`Java 21` · `Spring Boot 4.1` · `Spring Web MVC` · `Spring Data JPA` · `Apache Kafka` · `PostgreSQL` · `Flyway` · `Docker Compose` · `MapStruct` · `OpenAPI` · `JUnit 5` · `Mockito` ·  `Testcontainers` · `Gradle`
+`Java 21` · `Spring Boot 4.1` · `Spring Web MVC` · `Spring Data JPA` · `Apache Kafka` · `PostgreSQL` · `Flyway` · `Docker Compose` · `Docker` · `Spring Boot Actuator` · `MapStruct` · `OpenAPI` · `JUnit 5` · `Mockito` · `Testcontainers` · `Gradle` · `GitHub Actions`
 
 ## Локальный запуск
 
-Создать `.env` из шаблона:
+Для запуска всей платформы в контейнерах нужен Docker Engine / Docker Desktop с Docker Compose v2.
+
+### Linux
 
 ```bash
 cp .env.example .env
+make up-build
 ```
 
-Запустить PostgreSQL, Kafka и Kafka UI:
+Если `make` не установлен:
 
 ```bash
-docker compose up -d
+docker compose up -d --build
+```
+
+### Windows (PowerShell)
+
+```powershell
+Copy-Item .env.example .env
+docker compose up -d --build
+```
+
+Docker Compose собирает оба сервиса, поднимает PostgreSQL, Kafka и Kafka UI. Сервисы стартуют после готовности БД и Kafka; их health checks используют Actuator: `/actuator/health`.
+
+Порты по умолчанию:
+
+- `order-service` — `8081`;
+- `inventory-service` — `8082`;
+- Kafka UI — `8085`.
+
+Полезные команды:
+
+```bash
+docker compose ps
+docker compose logs -f order-service
+docker compose down
+```
+
+`docker compose down -v` также удалит локальные PostgreSQL-тома.
+
+### Запуск сервисов из IDE
+
+Создать `.env` из шаблона и запустить инфраструктуру:
+
+```bash
+cp .env.example .env
+docker compose up -d order-postgres inventory-postgres kafka kafka-ui kafka-init
 ```
 
 Запустить сервисы в отдельных терминалах:
@@ -234,11 +268,7 @@ cd order-service
 ./gradlew bootRun
 ```
 
-Порты по умолчанию:
-
-- `order-service` — `8081`;
-- `inventory-service` — `8082`;
-- Kafka UI — `8085`.
+В Windows PowerShell используйте `Copy-Item` вместо `cp`, а `./gradlew.bat` вместо `./gradlew`.
 
 ## Testing и GitHub Actions CI
 
@@ -253,16 +283,10 @@ cd order-service
 Локальный build:
 
 ```bash
-cd order-service
-./gradlew clean build
+./gradlew build
 ```
 
-```bash
-cd inventory-service
-./gradlew clean build
-```
-
-GitHub Actions запускает отдельный matrix job для `order-service` и `inventory-service` при Pull Request и push в `master`. При failure test reports сохраняются как workflow artifacts.
+GitHub Actions запускает отдельный matrix job для `order-service` и `inventory-service` при Pull Request и push в `master`. При failure test reports сохраняются как workflow artifacts. Отдельный Docker job валидирует Compose-конфигурацию, собирает образы и ожидает готовности сервисов по health checks.
 
 ## Текущий статус
 
@@ -277,7 +301,8 @@ GitHub Actions запускает отдельный matrix job для `order-se
 - Inbox Pattern и идемпотентность по `eventId`;
 - atomic processing: inbox, reservation, stock changes и result outbox;
 - retry, non-retryable event errors и Dead Letter Topic;
-- Flyway migrations, Docker Compose, автоматические тесты и GitHub Actions CI.
+- Flyway migrations, автоматические тесты и GitHub Actions CI;
+- Docker Compose, multi-stage Dockerfile для обоих сервисов, non-root runtime и Actuator health checks.
 
 ### Следующие этапы
 

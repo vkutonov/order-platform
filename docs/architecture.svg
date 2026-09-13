@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-labelledby="title desc">
+  <title id="title">Как устроен Order Platform</title>
+  <desc id="desc">Client calls order and inventory services. Order service uses inventory service over HTTP. Each service owns a PostgreSQL database and publishes events to Kafka through an outbox relay.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#b7bec8"/></marker>
+    <style>
+      .canvas { fill: #0f1217; }
+      .node { fill: #1b2027; stroke: #aeb6c1; stroke-width: 1.5; }
+      .node-wide { fill: #1b2027; stroke: #aeb6c1; stroke-width: 1.5; }
+      .edge { fill: none; stroke: #b7bec8; stroke-width: 1.5; marker-end: url(#arrow); }
+      .event-edge { fill: none; stroke: #b7bec8; stroke-width: 1.5; stroke-dasharray: 5 4; marker-end: url(#arrow); }
+      .title { font: 700 27px Arial, sans-serif; fill: #f1f5f9; }
+      .name { font: 600 18px Arial, sans-serif; fill: #f1f5f9; }
+      .detail { font: 400 14px Arial, sans-serif; fill: #cbd5e1; }
+      .label { font: 600 13px Arial, sans-serif; fill: #f1f5f9; }
+      .label-box { fill: #5f6670; }
+    </style>
+  </defs>
+
+  <rect class="canvas" width="1400" height="900"/>
+  <text class="title" x="54" y="62">Как устроено</text>
+  <line x1="54" y1="78" x2="1346" y2="78" stroke="#343b45" stroke-width="1"/>
+
+  <rect class="node" x="590" y="116" width="220" height="66"/>
+  <text class="name" x="700" y="155" text-anchor="middle">Client</text>
+
+  <rect class="node" x="240" y="282" width="270" height="86"/>
+  <text class="name" x="375" y="322" text-anchor="middle">order-service</text>
+  <text class="detail" x="375" y="347" text-anchor="middle">orders · status history</text>
+
+  <rect class="node" x="890" y="282" width="270" height="86"/>
+  <text class="name" x="1025" y="322" text-anchor="middle">inventory-service</text>
+  <text class="detail" x="1025" y="347" text-anchor="middle">products · stock · reservations</text>
+
+  <rect class="node" x="270" y="466" width="210" height="72"/>
+  <text class="name" x="375" y="498" text-anchor="middle">order-postgres</text>
+  <text class="detail" x="375" y="520" text-anchor="middle">orders + outbox</text>
+
+  <rect class="node" x="920" y="466" width="210" height="72"/>
+  <text class="name" x="1025" y="498" text-anchor="middle">inventory-postgres</text>
+  <text class="detail" x="1025" y="520" text-anchor="middle">inbox + reservations + outbox</text>
+
+  <rect class="node-wide" x="250" y="628" width="250" height="60"/>
+  <text class="name" x="375" y="664" text-anchor="middle">Order Outbox Relay</text>
+
+  <rect class="node-wide" x="900" y="628" width="250" height="60"/>
+  <text class="name" x="1025" y="664" text-anchor="middle">Inventory Outbox Relay</text>
+
+  <rect class="node" x="585" y="752" width="230" height="70"/>
+  <text class="name" x="700" y="783" text-anchor="middle">Apache Kafka</text>
+  <text class="detail" x="700" y="806" text-anchor="middle">order.events · inventory.events · DLT</text>
+
+  <path class="edge" d="M650 182L432 282"/>
+  <path class="edge" d="M750 182L968 282"/>
+  <rect class="label-box" x="676" y="202" width="48" height="24"/>
+  <text class="label" x="700" y="219" text-anchor="middle">REST</text>
+
+  <path class="edge" d="M510 325L890 325"/>
+  <rect class="label-box" x="644" y="291" width="112" height="24"/>
+  <text class="label" x="700" y="308" text-anchor="middle">HTTP snapshots</text>
+
+  <path class="edge" d="M375 368L375 466"/>
+  <path class="edge" d="M1025 368L1025 466"/>
+  <path class="edge" d="M375 538L375 628"/>
+  <path class="edge" d="M1025 538L1025 628"/>
+
+  <path class="event-edge" d="M375 688L625 752"/>
+  <rect class="label-box" x="470" y="704" width="104" height="24"/>
+  <text class="label" x="522" y="721" text-anchor="middle">order.events</text>
+
+  <path class="event-edge" d="M1025 688L775 752"/>
+  <rect class="label-box" x="830" y="704" width="120" height="24"/>
+  <text class="label" x="890" y="721" text-anchor="middle">inventory.events</text>
+
+  <path class="event-edge" d="M700 752L700 410L890 352"/>
+  <rect class="label-box" x="718" y="468" width="88" height="24"/>
+  <text class="label" x="762" y="485" text-anchor="middle">consume</text>
+</svg>

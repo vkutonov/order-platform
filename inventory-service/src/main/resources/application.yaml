@@ -1,5 +1,5 @@
 server:
-  port: ${INVENTORY_SERVICE_PORT}
+  port: ${INVENTORY_SERVICE_PORT:8082}
 
 spring:
   config:
@@ -11,7 +11,7 @@ spring:
     name: inventory-service
 
   datasource:
-    url: jdbc:postgresql://localhost:${INVENTORY_DB_PORT}/${INVENTORY_DB_NAME}
+    url: jdbc:postgresql://${INVENTORY_DB_HOST:localhost}:${INVENTORY_DB_PORT:5434}/${INVENTORY_DB_NAME:inventory_db}
     username: ${INVENTORY_DB_USERNAME}
     password: ${INVENTORY_DB_PASSWORD}
     driver-class-name: org.postgresql.Driver

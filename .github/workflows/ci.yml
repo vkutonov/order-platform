@@ -15,6 +15,11 @@ permissions:
   contents: read
 
 jobs:
+
+  # =========================
+  # Java build + tests
+  # =========================
+
   build-and-test:
     name: Build and test (${{ matrix.service }})
     runs-on: ubuntu-latest
@@ -33,20 +38,23 @@ jobs:
     defaults:
       run:
         shell: bash
+
         working-directory: ${{ matrix.service }}
 
     env:
       JAVA_VERSION: '21'
       SPRING_PROFILES_ACTIVE: test
+
       GRADLE_OPTS: >-
         -Dorg.gradle.daemon=false
         -Dorg.gradle.console=plain
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Set up Java ${{ env.JAVA_VERSION }}
+      - name: Set up Java
         uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -56,14 +64,13 @@ jobs:
       - name: Show Java version
         run: java -version
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x ./gradlew
-
       - name: Build and run tests
-        run: ./gradlew clean build --no-daemon --stacktrace
+        run: |
+          chmod +x ./gradlew
+          ./gradlew build --no-daemon --stacktrace
 
       - name: Upload test reports on failure
-        if: failure()
+        if: ${{ failure() && env.ACT != 'true' }}
         uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.service }}-test-reports
@@ -72,3 +79,53 @@ jobs:
             ${{ matrix.service }}/build/test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+
+  # =========================
+  # Docker + Compose
+  # =========================
+
+  docker-integration:
+    name: Docker integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      ORDER_DB_NAME: order_db
+      ORDER_DB_USERNAME: order_user
+      ORDER_DB_PASSWORD: order_password
+      ORDER_DB_PORT: 5433
+
+      INVENTORY_DB_NAME: inventory_db
+      INVENTORY_DB_USERNAME: inventory_user
+      INVENTORY_DB_PASSWORD: inventory_password
+      INVENTORY_DB_PORT: 5434
+
+      ORDER_SERVICE_PORT: 8081
+      INVENTORY_SERVICE_PORT: 8082
+
+      KAFKA_EXTERNAL_PORT: 9092
+      KAFKA_UI_PORT: 8080
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate Compose configuration
+        run: make config
+
+      - name: Build and start stack
+        run: make ci-up-build
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Stop stack
+        if: always()
+        run: make down
+
