@@ -186,7 +186,9 @@ class ProductServiceTest {
 
         assertThatThrownBy(() -> productService.findProducts(productIds))
                 .isInstanceOf(ProductNotFoundException.class)
-                .hasMessageContaining(missingProductId.toString());
+                .hasMessageContaining(missingProductId.toString())
+                .satisfies(exception -> assertThat(((ProductNotFoundException) exception).getProductIds())
+                        .containsExactly(missingProductId));
     }
 
     private ProductEntity product(UUID productId) {

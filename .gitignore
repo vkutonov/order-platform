@@ -33,6 +33,7 @@ docker-data/
 .kotlin
 .agents
 amplicode.xml
+.actrc
 
 ### IntelliJ IDEA ###
 .idea/modules.xml

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -85,5 +86,22 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().code()).isEqualTo("MIXED_ORDER_CURRENCIES");
         assertThat(response.getBody().message()).contains("RUB", "USD");
+    }
+
+    @Test
+    void missingProductsReturnsStructuredIdsAndOmitsEmptyFields() {
+        var response = handler.handleOrderServiceException(
+                new ProductNotFoundException(Set.of(ORDER_ID)),
+                request
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody().code()).isEqualTo("PRODUCT_NOT_FOUND");
+        assertThat(response.getBody().message())
+                .isEqualTo("Не удалось создать заказ: некоторые товары отсутствуют");
+        assertThat(response.getBody().missingProductIds()).containsExactly(ORDER_ID);
+        assertThat(new JsonMapper().writeValueAsString(response.getBody()))
+                .doesNotContain("\"error\":", "\"fieldErrors\":")
+                .contains("\"missingProductIds\":[\"" + ORDER_ID + "\"]");
     }
 }

@@ -15,6 +15,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Clock;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -31,6 +32,12 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         ApiErrorCode errorCode = exception.getErrorCode();
+        List<UUID> missingProductIds = exception instanceof ProductNotFoundException productNotFound
+                ? productNotFound.getProductIds().stream().sorted().toList()
+                : List.of();
+        String message = exception instanceof ProductNotFoundException
+                ? "Некоторые товары не найдены"
+                : exception.getMessage();
 
         log.warn(
                 "Inventory operation failed: path={}, code={}, message={}",
@@ -41,9 +48,10 @@ public class GlobalExceptionHandler {
 
         return clientErrorResponse(
                 errorCode,
-                exception.getMessage(),
+                message,
                 request,
-                List.of()
+                List.of(),
+                missingProductIds
         );
     }
 
@@ -170,7 +178,7 @@ public class GlobalExceptionHandler {
         ServerErrorResponse response = new ServerErrorResponse(
                 clock.instant(),
                 status.value(),
-                status.getReasonPhrase(),
+                "INTERNAL_SERVER_ERROR",
                 INTERNAL_SERVER_ERROR_MESSAGE,
                 request.getRequestURI()
         );
@@ -184,14 +192,24 @@ public class GlobalExceptionHandler {
             HttpServletRequest request,
             List<FieldErrorResponse> fieldErrors
     ) {
+        return clientErrorResponse(errorCode, message, request, fieldErrors, List.of());
+    }
+
+    private ResponseEntity<ClientErrorResponse> clientErrorResponse(
+            ApiErrorCode errorCode,
+            String message,
+            HttpServletRequest request,
+            List<FieldErrorResponse> fieldErrors,
+            List<UUID> missingProductIds
+    ) {
         HttpStatus status = errorCode.status();
         ClientErrorResponse response = new ClientErrorResponse(
                 clock.instant(),
                 status.value(),
-                status.getReasonPhrase(),
                 errorCode.name(),
                 message,
                 request.getRequestURI(),
+                missingProductIds,
                 fieldErrors
         );
 
