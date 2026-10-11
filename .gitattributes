@@ -1,0 +1,2 @@
+# Linux Gradle wrapper must keep LF line endings on Windows checkouts.
+gradlew text eol=lf

@@ -47,7 +47,7 @@ up-build: .env
 	$(COMPOSE) up -d --build
 
 ci-up-build: .env
-	$(COMPOSE) up -d --wait --wait-timeout 120 --build order-service inventory-service
+	$(COMPOSE) up -d --wait --wait-timeout 120 --build order-service inventory-service payment-service
 
 down:
 	$(COMPOSE) down

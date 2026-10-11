@@ -31,7 +31,7 @@ jobs:
         service:
           - order-service
           - inventory-service
-          # - payment-service
+          - payment-service
           # - notification-service
           # - api-gateway
 
@@ -101,8 +101,14 @@ jobs:
       INVENTORY_DB_PASSWORD: inventory_password
       INVENTORY_DB_PORT: 5434
 
+      PAYMENT_DB_NAME: payment_db
+      PAYMENT_DB_USERNAME: payment_user
+      PAYMENT_DB_PASSWORD: payment_password
+      PAYMENT_DB_PORT: 5435
+
       ORDER_SERVICE_PORT: 8081
       INVENTORY_SERVICE_PORT: 8082
+      PAYMENT_SERVICE_PORT: 8083
 
       KAFKA_EXTERNAL_PORT: 9092
       KAFKA_UI_PORT: 8080

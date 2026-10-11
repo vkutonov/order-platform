@@ -11,6 +11,7 @@ COPY settings.gradle build.gradle ./
 
 COPY order-service/build.gradle order-service/
 COPY inventory-service/build.gradle inventory-service/
+COPY payment-service/build.gradle payment-service/
 
 COPY inventory-service/src inventory-service/src
 
