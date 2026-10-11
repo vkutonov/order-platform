@@ -11,6 +11,7 @@ import com.valentin.orderservice.domain.dictionary.OrderChangeHistoryReason;
 import com.valentin.orderservice.domain.dictionary.OrderStatus;
 import com.valentin.orderservice.domain.dictionary.ReservationFailureCode;
 import com.valentin.orderservice.messaging.event.OrderCreatedEvent;
+import com.valentin.orderservice.messaging.event.OrderReadyForPaymentEvent;
 import com.valentin.orderservice.dto.*;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.mapper.OrderMapper;
@@ -141,6 +142,25 @@ public class OrderCommandService {
                 OrderChangeHistoryReason.INVENTORY_RESERVED,
                 timeNow
         );
+
+        UUID eventId = UUID.randomUUID();
+        OrderReadyForPaymentEvent paymentEvent = OrderReadyForPaymentEvent.of(
+                eventId,
+                order.getId(),
+                order.getUserId(),
+                order.getTotalPrice(),
+                order.getCurrency(),
+                timeNow
+        );
+
+        outboxEventRepository.save(OutboxEventEntity.create(
+                eventId,
+                "Order",
+                order.getId(),
+                paymentEvent.eventType(),
+                objectMapper.writeValueAsString(paymentEvent),
+                timeNow
+        ));
 
         log.info(
                 "Order inventory reserved: orderId={}, oldStatus={}, newStatus={}",

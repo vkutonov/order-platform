@@ -47,6 +47,14 @@ Java 21 · Spring Boot · PostgreSQL · Apache Kafka · Transactional Outbox · 
 - `order-service` запрашивает у `inventory-service` product snapshots по HTTP.
 - Сервисы обмениваются доменными событиями через Kafka и не используют общую базу данных.
 
+После успешного резервирования `order-service` переводит заказ в `WAITING_FOR_PAYMENT`
+и в той же транзакции сохраняет `OrderReadyForPaymentEvent` в существующий outbox.
+Текущий publisher отправляет его в `order.events` с ключом `orderId`; повторы доставки
+используют тот же `eventId`. Контракт версии 1 содержит `eventId`, `eventType`,
+`eventVersion`, `orderId`, `userId`, `totalPrice`, `currency`, `context` и `occurredAt`.
+`totalPrice` и `currency` берутся из сохранённого заказа. `inventory-service`
+пропускает это событие; его обработчик в `payment-service` ещё предстоит реализовать.
+
 ## Сильные стороны
 
 - **Event-driven processing** — резервирование выполняется асинхронно через Kafka.
