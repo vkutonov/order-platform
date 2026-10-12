@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = "app.outbox.polling.enabled=false")
 @AutoConfigureMockMvc
 @Testcontainers
 class PaymentServiceApplicationTests {
@@ -56,7 +56,7 @@ class PaymentServiceApplicationTests {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT to_regclass('public.flyway_schema_history')::text", String.class
         )).isEqualTo("flyway_schema_history");
-        assertThat(flyway.info().applied()).isEmpty();
+        assertThat(flyway.info().applied()).hasSize(2);
         assertThat(clock.getZone()).isEqualTo(ZoneOffset.UTC);
     }
 
