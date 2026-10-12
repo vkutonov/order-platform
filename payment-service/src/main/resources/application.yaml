@@ -30,6 +30,36 @@ spring:
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      client-id: payment-service-outbox-producer
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        "[enable.idempotence]": true
+    consumer:
+      group-id: payment-commands-v1
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      max-poll-records: 50
+    listener:
+      type: single
+      ack-mode: batch
+      concurrency: 1
+
+app:
+  kafka:
+    topics:
+      payment-events: payment.events
+      payment-commands: payment.commands
+      payment-commands-dlt: payment.commands.payment-service.dlt
+  outbox:
+    polling:
+      enabled: true
+      batch-size: 50
+      fixed-delay-ms: 5000
+      processing-timeout-ms: 60000
 
 management:
   endpoints:
