@@ -12,8 +12,8 @@ spring:
 
   datasource:
     url: jdbc:postgresql://${PAYMENT_DB_HOST:localhost}:${PAYMENT_DB_PORT:5435}/${PAYMENT_DB_NAME:payment_db}
-    username: ${PAYMENT_DB_USERNAME:payment_user}
-    password: ${PAYMENT_DB_PASSWORD:change_me}
+    username: ${PAYMENT_DB_USERNAME}
+    password: ${PAYMENT_DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -49,6 +49,9 @@ spring:
       concurrency: 1
 
 app:
+  payment:
+    mock:
+      public-url: ${PAYMENT_PUBLIC_URL:http://localhost:${PAYMENT_SERVICE_PORT:8083}}
   kafka:
     topics:
       payment-events: payment.events

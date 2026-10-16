@@ -83,10 +83,11 @@ services:
     environment:
       PAYMENT_DB_HOST: payment-postgres
       PAYMENT_DB_PORT: 5432
-      PAYMENT_DB_NAME: ${PAYMENT_DB_NAME:-payment_db}
-      PAYMENT_DB_USERNAME: ${PAYMENT_DB_USERNAME:-payment_user}
-      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD:-change_me}
+      PAYMENT_DB_NAME: ${PAYMENT_DB_NAME}
+      PAYMENT_DB_USERNAME: ${PAYMENT_DB_USERNAME}
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      PAYMENT_PUBLIC_URL: ${PAYMENT_PUBLIC_URL:-http://localhost:8083}
 
     depends_on:
       payment-postgres:
@@ -141,11 +142,11 @@ services:
     image: postgres:18.4-bookworm
     container_name: payment-postgres
     environment:
-      POSTGRES_DB: ${PAYMENT_DB_NAME:-payment_db}
-      POSTGRES_USER: ${PAYMENT_DB_USERNAME:-payment_user}
-      POSTGRES_PASSWORD: ${PAYMENT_DB_PASSWORD:-change_me}
+      POSTGRES_DB: ${PAYMENT_DB_NAME}
+      POSTGRES_USER: ${PAYMENT_DB_USERNAME}
+      POSTGRES_PASSWORD: ${PAYMENT_DB_PASSWORD}
     ports:
-      - "127.0.0.1:${PAYMENT_DB_PORT:-5435}:5432"
+      - "127.0.0.1:${PAYMENT_DB_PORT}:5432"
     volumes:
       - payment-postgres-data:/var/lib/postgresql
     healthcheck:

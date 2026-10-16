@@ -34,6 +34,10 @@ Java 21 · Spring Boot · PostgreSQL · Apache Kafka · Transactional Outbox · 
       <td><code>inventory-service</code></td>
       <td>Товары, складские остатки и резервации</td>
     </tr>
+    <tr>
+      <td><code>payment-service</code></td>
+      <td>Модель платежей, Kafka-контракты, outbox и локальная имитация оплаты</td>
+    </tr>
   </tbody>
 </table>
 
@@ -53,7 +57,12 @@ Java 21 · Spring Boot · PostgreSQL · Apache Kafka · Transactional Outbox · 
 используют тот же `eventId`. Контракт версии 1 содержит `eventId`, `eventType`,
 `eventVersion`, `orderId`, `userId`, `totalPrice`, `currency`, `context` и `occurredAt`.
 `totalPrice` и `currency` берутся из сохранённого заказа. `inventory-service`
-пропускает это событие; его обработчик в `payment-service` ещё предстоит реализовать.
+пропускает это событие. Запуск попытки оплаты пользователем и обработку команды
+`CreatePaymentRequested` в `payment-service` ещё предстоит реализовать.
+
+Для локальной проверки оплаты есть встроенная страница payment-service с кнопками
+«Оплатить» и «Отклонить». Она доступна сразу после запуска, использует ту же БД
+и существующий outbox. Отдельный провайдер не нужен. Инструкция: [payment-service](payment-service/README.md).
 
 ## Сильные стороны
 
