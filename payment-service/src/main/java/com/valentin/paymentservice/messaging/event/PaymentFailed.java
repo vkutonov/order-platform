@@ -22,8 +22,6 @@ public record PaymentFailed(
         BigDecimal totalPrice,
         @NotNull @Pattern(regexp = "[A-Z]{3}")
         String currency,
-        @Size(max = 200)
-        String providerPaymentId,
         @NotBlank @Size(max = 100)
         String failureCode,
         Map<String, String> context,
@@ -40,13 +38,12 @@ public record PaymentFailed(
             UUID paymentId,
             BigDecimal totalPrice,
             String currency,
-            String providerPaymentId,
             String failureCode,
             Instant occurredAt
     ) {
         return new PaymentFailed(
                 eventId, TYPE, VERSION, orderId, paymentId,
-                totalPrice, currency, providerPaymentId, failureCode,
+                totalPrice, currency, failureCode,
                 Map.of("source", "payment-service"), occurredAt
         );
     }

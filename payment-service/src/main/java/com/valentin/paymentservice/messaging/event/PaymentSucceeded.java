@@ -22,8 +22,6 @@ public record PaymentSucceeded(
         BigDecimal totalPrice,
         @NotNull @Pattern(regexp = "[A-Z]{3}")
         String currency,
-        @NotBlank @Size(max = 200)
-        String providerPaymentId,
         Map<String, String> context,
         @NotNull
         Instant occurredAt
@@ -38,12 +36,11 @@ public record PaymentSucceeded(
             UUID paymentId,
             BigDecimal totalPrice,
             String currency,
-            String providerPaymentId,
             Instant occurredAt
     ) {
         return new PaymentSucceeded(
                 eventId, TYPE, VERSION, orderId, paymentId,
-                totalPrice, currency, providerPaymentId,
+                totalPrice, currency,
                 Map.of("source", "payment-service"), occurredAt
         );
     }

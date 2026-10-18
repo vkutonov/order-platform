@@ -36,8 +36,11 @@ spring:
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
       properties:
         "[enable.idempotence]": true
+        "[delivery.timeout.ms]": 30000
+        "[request.timeout.ms]": 10000
+        "[max.block.ms]": 5000
     consumer:
-      group-id: payment-commands-v1
+      group-id: payment-order-events-v1
       enable-auto-commit: false
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -50,13 +53,12 @@ spring:
 
 app:
   payment:
-    mock:
-      public-url: ${PAYMENT_PUBLIC_URL:http://localhost:${PAYMENT_SERVICE_PORT:8083}}
+    expiration-minutes: 15
   kafka:
     topics:
+      order-events: order.events
       payment-events: payment.events
-      payment-commands: payment.commands
-      payment-commands-dlt: payment.commands.payment-service.dlt
+      order-events-dlt: order.events.payment-service.dlt
   outbox:
     polling:
       enabled: true

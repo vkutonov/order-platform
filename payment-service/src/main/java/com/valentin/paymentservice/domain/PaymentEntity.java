@@ -21,7 +21,6 @@ import java.util.UUID;
 public class PaymentEntity {
 
     private static final Map<PaymentStatus, Set<PaymentStatus>> ALLOWED_TRANSITIONS = Map.of(
-            PaymentStatus.CREATING, Set.of(PaymentStatus.PENDING, PaymentStatus.FAILED),
             PaymentStatus.PENDING, Set.of(PaymentStatus.SUCCEEDED, PaymentStatus.FAILED),
             PaymentStatus.SUCCEEDED, Set.of(),
             PaymentStatus.FAILED, Set.of()
@@ -49,12 +48,6 @@ public class PaymentEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private PaymentStatus status;
-
-    @Column(name = "provider_payment_id", length = 200)
-    private String providerPaymentId;
-
-    @Column(name = "checkout_url", length = 2048)
-    private String checkoutUrl;
 
     @Column(name = "expires_at", nullable = false, updatable = false)
     private Instant expiresAt;
@@ -98,25 +91,11 @@ public class PaymentEntity {
         payment.attemptNumber = attemptNumber;
         payment.totalPrice = totalPrice.setScale(2);
         payment.currency = currency;
-        payment.status = PaymentStatus.CREATING;
+        payment.status = PaymentStatus.PENDING;
         payment.expiresAt = Objects.requireNonNull(expiresAt);
         payment.createdAt = Objects.requireNonNull(now);
         payment.updatedAt = now;
         return payment;
-    }
-
-    public void markSessionCreated(String providerPaymentId, String checkoutUrl, Instant now) {
-        if (providerPaymentId == null || providerPaymentId.isBlank()
-                || checkoutUrl == null || checkoutUrl.isBlank()) {
-            throw new IllegalArgumentException("Provider payment ID and checkout URL must not be blank");
-        }
-        if (status == PaymentStatus.PENDING && Objects.equals(this.providerPaymentId, providerPaymentId)
-                && Objects.equals(this.checkoutUrl, checkoutUrl)) {
-            return;
-        }
-        changeStatus(PaymentStatus.PENDING, now);
-        this.providerPaymentId = providerPaymentId;
-        this.checkoutUrl = checkoutUrl;
     }
 
     public void markSucceeded(Instant now) {

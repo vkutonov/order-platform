@@ -18,7 +18,7 @@ public class KafkaConsumerConfig {
     @Bean
     public DefaultErrorHandler kafkaErrorHandler(
             KafkaTemplate<String, String> kafkaTemplate,
-            @Value("${app.kafka.topics.payment-commands-dlt}")
+            @Value("${app.kafka.topics.order-events-dlt}")
             String dltTopic
     ) {
 

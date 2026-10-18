@@ -21,7 +21,6 @@ class RefundEntityTest {
     @Test
     void definitiveRefundFailure_isTerminalAndDoesNotChangeCharge() {
         PaymentEntity payment = payment();
-        payment.markSessionCreated("session-1", "http://provider/pay/1", NOW);
         payment.markSucceeded(NOW);
         RefundEntity refund = RefundEntity.create(UUID.randomUUID(), payment, "RESERVATION_EXPIRED", NOW);
 
@@ -37,12 +36,10 @@ class RefundEntityTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = PaymentStatus.class, names = {"CREATING", "PENDING", "FAILED"})
+    @EnumSource(value = PaymentStatus.class, names = {"PENDING", "FAILED"})
     void refund_requiresSuccessfulCharge(PaymentStatus status) {
         PaymentEntity payment = payment();
-        if (status == PaymentStatus.PENDING) {
-            payment.markSessionCreated("session-1", "http://provider/pay/1", NOW);
-        } else if (status == PaymentStatus.FAILED) {
+        if (status == PaymentStatus.FAILED) {
             payment.markFailed("DECLINED", NOW);
         }
 

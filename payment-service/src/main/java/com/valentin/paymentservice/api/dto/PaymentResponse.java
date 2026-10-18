@@ -13,14 +13,13 @@ public record PaymentResponse(
         BigDecimal totalPrice,
         String currency,
         PaymentStatus status,
-        String checkoutUrl,
         Instant expiresAt,
         String failureCode
 ) {
 
     public static PaymentResponse from(PaymentEntity payment) {
         return new PaymentResponse(payment.getId(), payment.getOrderId(), payment.getTotalPrice(),
-                payment.getCurrency(), payment.getStatus(), payment.getCheckoutUrl(),
+                payment.getCurrency(), payment.getStatus(),
                 payment.getExpiresAt(), payment.getFailureCode());
     }
 }

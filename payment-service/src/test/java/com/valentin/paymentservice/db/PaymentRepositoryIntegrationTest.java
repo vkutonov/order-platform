@@ -58,8 +58,6 @@ class PaymentRepositoryIntegrationTest {
     @Autowired
     private RefundRepository refunds;
     @Autowired
-    private ProcessedEventRepository inbox;
-    @Autowired
     private OutboxEventRepository outbox;
     @Autowired
     private PlatformTransactionManager transactionManager;
@@ -78,23 +76,13 @@ class PaymentRepositoryIntegrationTest {
         payments.saveAndFlush(first);
 
         PaymentEntity second = payment(orderId, 2);
-        second.markSessionCreated("session-" + second.getId(), "http://provider/pay/2", NOW);
         second.markFailed("DECLINED", NOW);
         second.markFailed("DECLINED", NOW.plusSeconds(1));
         assertThat(second.getUpdatedAt()).isEqualTo(NOW);
-        assertThatThrownBy(() -> second.markSessionCreated("replacement", "http://provider/pay/other", NOW))
-                .isInstanceOf(InvalidPaymentStatusException.class);
         payments.saveAndFlush(second);
 
         PaymentEntity third = payment(orderId, 3);
-        assertThatThrownBy(() -> third.markSucceeded(NOW))
-                .isInstanceOf(InvalidPaymentStatusException.class);
-        String sessionId = "session-" + third.getId();
-        third.markSessionCreated(sessionId, "http://provider/pay/3", NOW);
-        third.markSessionCreated(sessionId, "http://provider/pay/3", NOW.plusSeconds(1));
-        assertThat(third.getUpdatedAt()).isEqualTo(NOW);
-        assertThatThrownBy(() -> third.markSessionCreated("replacement", "http://provider/pay/other", NOW))
-                .isInstanceOf(InvalidPaymentStatusException.class);
+        assertThat(third.getStatus()).isEqualTo(PaymentStatus.PENDING);
         third.markSucceeded(NOW.plusSeconds(2));
         third.markSucceeded(NOW.plusSeconds(3));
         assertThat(third.getUpdatedAt()).isEqualTo(NOW.plusSeconds(2));
@@ -143,7 +131,7 @@ class PaymentRepositoryIntegrationTest {
     }
 
     @Test
-    void attemptNumber_andProviderSessionCannotBeReused() {
+    void attemptNumberCannotBeReused() {
         UUID orderId = UUID.randomUUID();
         PaymentEntity first = payment(orderId, 1);
         first.markFailed("DECLINED", NOW);
@@ -152,15 +140,6 @@ class PaymentRepositoryIntegrationTest {
         assertThatThrownBy(() -> payments.saveAndFlush(payment(orderId, 1)))
                 .isInstanceOf(DataIntegrityViolationException.class);
 
-        PaymentEntity withSession = payment(UUID.randomUUID(), 1);
-        withSession.markSessionCreated("unique-" + first.getId(), "http://provider/pay/1", NOW);
-        payments.saveAndFlush(withSession);
-        PaymentEntity duplicateSession = payment(UUID.randomUUID(), 1);
-        duplicateSession.markSessionCreated(withSession.getProviderPaymentId(), "http://provider/pay/1", NOW);
-
-        assertThatThrownBy(() -> payments.saveAndFlush(duplicateSession))
-                .isInstanceOf(DataIntegrityViolationException.class);
-        assertThat(payments.findByProviderPaymentId(withSession.getProviderPaymentId())).isPresent();
     }
 
     @Test
@@ -168,52 +147,14 @@ class PaymentRepositoryIntegrationTest {
         PaymentEntity saved = payments.saveAndFlush(payment(UUID.randomUUID(), 1));
         PaymentEntity first = payments.findById(saved.getId()).orElseThrow();
         PaymentEntity stale = payments.findById(saved.getId()).orElseThrow();
-        first.markSessionCreated("session-" + saved.getId(), "http://provider/pay/1", NOW);
+        first.markSucceeded(NOW);
         payments.saveAndFlush(first);
         stale.markFailed("DECLINED", NOW);
 
         assertThatThrownBy(() -> payments.saveAndFlush(stale))
                 .isInstanceOf(ObjectOptimisticLockingFailureException.class);
         assertThat(payments.findById(saved.getId())).get()
-                .extracting(PaymentEntity::getStatus).isEqualTo(PaymentStatus.PENDING);
-    }
-
-    @Test
-    void inboxPaymentAndOutbox_commitTogetherAndDuplicateDoesNotRepeatEffect() {
-        PaymentEntity payment = payment(UUID.randomUUID(), 1);
-        UUID eventId = UUID.randomUUID();
-        OutboxEventEntity event = event(payment.getOrderId());
-
-        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            assertThat(inbox.tryInsert(eventId, "CreatePaymentRequested", payment.getOrderId(), NOW)).isEqualTo(1);
-            payments.saveAndFlush(payment);
-            outbox.saveAndFlush(event);
-        });
-
-        new TransactionTemplate(transactionManager).executeWithoutResult(status ->
-                assertThat(inbox.tryInsert(eventId, "CreatePaymentRequested", payment.getOrderId(), NOW)).isZero());
-
-        assertThat(inbox.existsById(eventId)).isTrue();
-        assertThat(payments.existsById(payment.getId())).isTrue();
-        assertThat(outbox.existsById(event.getId())).isTrue();
-    }
-
-    @Test
-    void transactionFailure_rollsBackInboxPaymentAndOutbox() {
-        PaymentEntity payment = payment(UUID.randomUUID(), 1);
-        UUID eventId = UUID.randomUUID();
-        OutboxEventEntity event = event(payment.getOrderId());
-
-        assertThatThrownBy(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            inbox.tryInsert(eventId, "CreatePaymentRequested", payment.getOrderId(), NOW);
-            payments.saveAndFlush(payment);
-            outbox.saveAndFlush(event);
-            throw new IllegalStateException("Simulated processing failure");
-        })).isInstanceOf(IllegalStateException.class);
-
-        assertThat(inbox.existsById(eventId)).isFalse();
-        assertThat(payments.existsById(payment.getId())).isFalse();
-        assertThat(outbox.existsById(event.getId())).isFalse();
+                .extracting(PaymentEntity::getStatus).isEqualTo(PaymentStatus.SUCCEEDED);
     }
 
     @Test
