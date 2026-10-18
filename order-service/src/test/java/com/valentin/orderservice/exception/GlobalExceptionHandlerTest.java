@@ -98,7 +98,7 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody().code()).isEqualTo("PRODUCT_NOT_FOUND");
         assertThat(response.getBody().message())
-                .isEqualTo("Не удалось создать заказ: некоторые товары отсутствуют");
+                .isEqualTo("Order creation failed, products missed");
         assertThat(response.getBody().missingProductIds()).containsExactly(ORDER_ID);
         assertThat(new JsonMapper().writeValueAsString(response.getBody()))
                 .doesNotContain("\"error\":", "\"fieldErrors\":")

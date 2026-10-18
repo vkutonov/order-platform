@@ -13,6 +13,7 @@ import com.valentin.orderservice.messaging.event.InventoryReservedEvent;
 import com.valentin.orderservice.messaging.event.OrderReadyForPaymentEvent;
 import com.valentin.orderservice.messaging.outbox.OutboxKafkaPublisher;
 import com.valentin.orderservice.messaging.outbox.OutboxEventPoller;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -27,6 +28,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Map;
@@ -87,6 +89,14 @@ class InventoryEventHandlerIntegrationTest {
 
     @MockitoBean
     private OutboxEventPoller outboxEventPoller;
+
+    @MockitoBean
+    private Clock clock;
+
+    @BeforeEach
+    void setUp() {
+        when(clock.instant()).thenReturn(OCCURRED_AT);
+    }
 
     @Test
     void handle_whenInventoryReserved_shouldCreatePaymentEventAndPublishThroughExistingPublisher() throws Exception {

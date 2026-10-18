@@ -94,7 +94,7 @@ class OrderControllerInventoryErrorTest {
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.code").value("PRODUCT_NOT_FOUND"))
                 .andExpect(jsonPath("$.message")
-                        .value("Не удалось создать заказ: некоторые товары отсутствуют"))
+                        .value("Order creation failed, products missed"))
                 .andExpect(jsonPath("$.missingProductIds.length()").value(1))
                 .andExpect(jsonPath("$.missingProductIds[0]").value(PRODUCT_ID))
                 .andExpect(jsonPath("$.path").value("/api/orders"))
@@ -118,7 +118,7 @@ class OrderControllerInventoryErrorTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("PRODUCT_NOT_FOUND"))
                 .andExpect(jsonPath("$.message")
-                        .value("Не удалось создать заказ: некоторые товары отсутствуют"))
+                        .value("Order creation failed, products missed"))
                 .andExpect(jsonPath("$.error").doesNotExist())
                 .andExpect(jsonPath("$.missingProductIds").doesNotExist());
 
