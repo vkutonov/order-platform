@@ -13,11 +13,14 @@ COPY order-service/build.gradle order-service/
 COPY inventory-service/build.gradle inventory-service/
 COPY payment-service/build.gradle payment-service/
 
-COPY inventory-service/src inventory-service/src
+COPY inventory-service/src/main inventory-service/src/main
 
 # BuildKit cache mount для использования кэша между builds
-RUN --mount=type=cache,target=/root/.gradle \
+RUN --mount=type=cache,id=inventory-service-gradle,target=/root/.gradle,sharing=locked \
     ./gradlew :inventory-service:bootJar --no-daemon
+
+RUN cp inventory-service/build/libs/*.jar app.jar \
+    && java -Djarmode=tools -jar app.jar extract --layers --destination extracted
 
 
 FROM eclipse-temurin:21-jre-jammy AS runtime
@@ -33,9 +36,10 @@ RUN groupadd --system app \
     --shell /usr/sbin/nologin \
     app
 
-COPY --from=builder --chmod=0444 \
-    /workspace/inventory-service/build/libs/*.jar \
-    app.jar
+COPY --from=builder /workspace/extracted/dependencies/ ./
+COPY --from=builder /workspace/extracted/spring-boot-loader/ ./
+COPY --from=builder /workspace/extracted/snapshot-dependencies/ ./
+COPY --from=builder /workspace/extracted/application/ ./
 
 USER app
 
