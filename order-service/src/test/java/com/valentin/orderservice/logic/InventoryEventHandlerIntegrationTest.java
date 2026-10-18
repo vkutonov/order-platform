@@ -119,7 +119,7 @@ class InventoryEventHandlerIntegrationTest {
 
         when(kafkaTemplate.send("order.events", order.getId().toString(), outboxEvent.getPayload()))
                 .thenReturn(CompletableFuture.completedFuture(null));
-        publisher.publish(outboxEvent);
+        publisher.publish(outboxEvent).get(10, java.util.concurrent.TimeUnit.SECONDS);
         verify(kafkaTemplate).send("order.events", order.getId().toString(), outboxEvent.getPayload());
 
         handler.handle(event);
