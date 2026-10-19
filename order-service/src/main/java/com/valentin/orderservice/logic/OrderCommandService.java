@@ -207,58 +207,6 @@ public class OrderCommandService {
         );
 
     }
-
-
-    @Transactional
-    public void markPaymentSucceeded(UUID orderId) {
-        OrderEntity order = findOrder(orderId);
-
-        OrderStatus oldStatus = order.getStatus();
-        Instant timeNow = clock.instant();
-
-        order.markPaymentSucceeded(timeNow);
-
-        saveStatusHistory(
-                order,
-                oldStatus,
-                order.getStatus(),
-                OrderChangeHistoryReason.PAYMENT_SUCCEEDED,
-                timeNow
-        );
-
-        log.info(
-                "Order payment succeeded: orderId={}, oldStatus={}, newStatus={}",
-                orderId,
-                oldStatus,
-                order.getStatus()
-        );
-    }
-
-    @Transactional
-    public void markPaymentFailed(UUID orderId) {
-        OrderEntity order = findOrder(orderId);
-
-        OrderStatus oldStatus = order.getStatus();
-        Instant timeNow = clock.instant();
-
-        order.markPaymentFailed(timeNow);
-
-        saveStatusHistory(
-                order,
-                oldStatus,
-                order.getStatus(),
-                OrderChangeHistoryReason.PAYMENT_FAILED,
-                timeNow
-        );
-
-        log.info(
-                "Order payment failed: orderId={}, oldStatus={}, newStatus={}",
-                orderId,
-                oldStatus,
-                order.getStatus()
-        );
-    }
-
     @Transactional
     public void cancelOrder(UUID orderId) {
         OrderEntity order = findOrder(orderId);

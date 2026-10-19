@@ -15,7 +15,6 @@ import com.valentin.orderservice.domain.dictionary.ProductStatus;
 import com.valentin.orderservice.messaging.event.OrderCreatedEvent;
 import com.valentin.orderservice.messaging.event.OrderCreatedItem;
 import com.valentin.orderservice.dto.*;
-import com.valentin.orderservice.exception.InvalidOrderStatusTransitionException;
 import com.valentin.orderservice.exception.MixedOrderCurrenciesException;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.exception.ProductNotFoundException;
@@ -568,54 +567,6 @@ public class OrderServiceTest {
                 NOW
         );
     }
-
-
-    @Test
-    void markPaymentSucceeded_shouldChangeStatusAndSaveHistory() {
-        OrderEntity order = orderWithStatus(OrderStatus.WAITING_FOR_PAYMENT);
-
-        when(orderRepository.findById(order.getId()))
-                .thenReturn(Optional.of(order));
-
-        actualOrderCommandService.markPaymentSucceeded(order.getId());
-
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
-        assertThat(order.getUpdatedAt()).isAfterOrEqualTo(order.getCreatedAt());
-
-        verify(orderRepository).findById(order.getId());
-        verify(orderHistoryRepository).save(historyCaptor.capture());
-        assertStatusHistory(
-                historyCaptor.getValue(),
-                order,
-                OrderStatus.WAITING_FOR_PAYMENT,
-                OrderStatus.PAID,
-                OrderChangeHistoryReason.PAYMENT_SUCCEEDED
-        );
-    }
-
-    @Test
-    void markPaymentFailed_shouldChangeStatusAndSaveHistory() {
-        OrderEntity order = orderWithStatus(OrderStatus.WAITING_FOR_PAYMENT);
-
-        when(orderRepository.findById(order.getId()))
-                .thenReturn(Optional.of(order));
-
-        actualOrderCommandService.markPaymentFailed(order.getId());
-
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED);
-        assertThat(order.getUpdatedAt()).isAfterOrEqualTo(order.getCreatedAt());
-
-        verify(orderRepository).findById(order.getId());
-        verify(orderHistoryRepository).save(historyCaptor.capture());
-        assertStatusHistory(
-                historyCaptor.getValue(),
-                order,
-                OrderStatus.WAITING_FOR_PAYMENT,
-                OrderStatus.PAYMENT_FAILED,
-                OrderChangeHistoryReason.PAYMENT_FAILED
-        );
-    }
-
     @Test
     void cancelOrder_shouldChangeStatusAndSaveHistory() {
         OrderEntity order = orderWithStatus(OrderStatus.WAITING_FOR_INVENTORY);
@@ -639,19 +590,6 @@ public class OrderServiceTest {
         );
     }
 
-    @Test
-    void invalidTransition_shouldThrowExceptionAndNotSaveHistory() {
-        OrderEntity order = orderWithStatus(OrderStatus.WAITING_FOR_INVENTORY);
-
-        when(orderRepository.findById(order.getId()))
-                .thenReturn(Optional.of(order));
-
-        assertThatThrownBy(() -> actualOrderCommandService.markPaymentSucceeded(order.getId()))
-                .isInstanceOf(InvalidOrderStatusTransitionException.class);
-
-        verify(orderRepository).findById(order.getId());
-        verifyNoInteractions(orderHistoryRepository);
-    }
 
     @Test
     void reserveInventory_shouldThrowOrderNotFoundException() {

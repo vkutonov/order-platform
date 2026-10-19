@@ -20,8 +20,13 @@ public class PaymentController {
         return payments.getAll();
     }
 
-    @PostMapping("/{id}/confirm")
-    public PaymentResponse confirm(@PathVariable UUID id) {
-        return payments.confirm(id);
+    @PostMapping("/by-order/{orderId}/confirm")
+    public PaymentResponse confirm(@PathVariable UUID orderId) {
+        return payments.confirm(orderId);
+    }
+
+    @PostMapping("/by-order/{orderId}/reject")
+    public PaymentResponse reject(@PathVariable UUID orderId) {
+        return payments.reject(orderId);
     }
 }

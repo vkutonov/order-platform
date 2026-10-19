@@ -75,24 +75,33 @@ public class PaymentService {
     }
 
     @Transactional
-    public PaymentResponse confirm(UUID paymentId) {
-        PaymentEntity payment = payments.findByIdForUpdate(paymentId)
+    public PaymentResponse confirm(UUID orderId) {
+        return complete(orderId, true);
+    }
+
+    @Transactional
+    public PaymentResponse reject(UUID orderId) {
+        return complete(orderId, false);
+    }
+
+    private PaymentResponse complete(UUID orderId, boolean confirmed) {
+        PaymentEntity payment = payments.findByOrderIdAndAttemptNumberForUpdate(orderId, 1)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment not found"));
         PaymentStatus oldStatus = payment.getStatus();
         if (oldStatus == PaymentStatus.SUCCEEDED || oldStatus == PaymentStatus.FAILED) {
-            log.debug("Payment confirmation skipped: paymentId={}, orderId={}, status={}",
-                    paymentId, payment.getOrderId(), payment.getStatus());
+            log.debug("Payment completion skipped: paymentId={}, orderId={}, status={}",
+                    payment.getId(), orderId, payment.getStatus());
             return PaymentResponse.from(payment);
         }
 
         var now = clock.instant();
         UUID eventId = UUID.randomUUID();
-        if (payment.getExpiresAt().isAfter(now)) {
+        if (confirmed && payment.getExpiresAt().isAfter(now)) {
             payment.markSucceeded(now);
             outbox.enqueue(PaymentSucceeded.of(eventId, payment.getOrderId(), payment.getId(),
                     payment.getTotalPrice(), payment.getCurrency(), now));
         } else {
-            payment.markFailed("SESSION_EXPIRED", now);
+            payment.markFailed(payment.getExpiresAt().isAfter(now) ? "DECLINED" : "SESSION_EXPIRED", now);
             outbox.enqueue(PaymentFailed.of(eventId, payment.getOrderId(), payment.getId(),
                     payment.getTotalPrice(), payment.getCurrency(), payment.getFailureCode(), now));
         }

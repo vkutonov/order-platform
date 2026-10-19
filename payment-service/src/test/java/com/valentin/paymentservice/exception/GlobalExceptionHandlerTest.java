@@ -35,7 +35,7 @@ class GlobalExceptionHandlerTest {
     @Test
     void expectedErrorsKeepTheirHttpStatus() throws Exception {
         UUID id = UUID.randomUUID();
-        String confirmation = "/api/payments/" + id + "/confirm";
+        String confirmation = "/api/payments/by-order/" + id + "/confirm";
         when(payments.confirm(id))
                 .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment not found"))
                 .thenThrow(new InvalidPaymentStatusException(id, PaymentStatus.SUCCEEDED, PaymentStatus.PENDING))
@@ -46,7 +46,7 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.detail").value("Payment not found"));
         mvc.perform(post(confirmation)).andExpect(status().isConflict());
         mvc.perform(post(confirmation)).andExpect(status().isConflict());
-        mvc.perform(post("/api/payments/invalid-id/confirm")).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/payments/by-order/invalid-id/confirm")).andExpect(status().isBadRequest());
         mvc.perform(get(confirmation)).andExpect(status().isMethodNotAllowed());
         verify(payments, times(3)).confirm(id);
         verifyNoMoreInteractions(payments);

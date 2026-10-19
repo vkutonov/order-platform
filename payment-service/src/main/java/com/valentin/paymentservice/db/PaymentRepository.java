@@ -14,8 +14,8 @@ import java.util.UUID;
 public interface PaymentRepository extends JpaRepository<PaymentEntity, UUID> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select p from PaymentEntity p where p.id = :id")
-    Optional<PaymentEntity> findByIdForUpdate(UUID id);
+    @Query("select p from PaymentEntity p where p.orderId = :orderId and p.attemptNumber = :attemptNumber")
+    Optional<PaymentEntity> findByOrderIdAndAttemptNumberForUpdate(UUID orderId, int attemptNumber);
 
     Optional<PaymentEntity> findByOrderIdAndAttemptNumber(UUID orderId, int attemptNumber);
 }

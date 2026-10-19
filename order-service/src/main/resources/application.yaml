@@ -66,10 +66,14 @@ spring:
 
 app:
   kafka:
+    consumer:
+      payment-group-id: order-payment-results-v1
     topics:
       order-events: order.events
       inventory-events: inventory.events
       inventory-events-dlt: inventory.events.order-service.dlt
+      payment-events: payment.events
+      payment-events-dlt: payment.events.order-service.dlt
 
   outbox:
     polling:

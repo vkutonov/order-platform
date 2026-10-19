@@ -11,6 +11,8 @@ import com.valentin.paymentservice.messaging.event.PaymentSucceeded;
 import com.valentin.paymentservice.messaging.parser.PaymentMessageParser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -74,6 +76,7 @@ class PaymentScenariosIntegrationTest {
     @Test
     void paymentsAreListed_andConcurrentConfirmationsPublishOneResult() throws Exception {
         var id = createPayment();
+        var orderId = payments.findById(id).orElseThrow().getOrderId();
         createPayment();
         mvc.perform(get("/api/payments"))
                 .andExpect(status().isOk())
@@ -81,15 +84,16 @@ class PaymentScenariosIntegrationTest {
 
         CountDownLatch start = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(2)) {
-            var first = executor.submit(() -> confirmAfterStart(id, start));
-            var second = executor.submit(() -> confirmAfterStart(id, start));
+            var first = executor.submit(() -> completeAfterStart(orderId, "confirm", start));
+            var second = executor.submit(() -> completeAfterStart(orderId, "confirm", start));
             start.countDown();
             assertThat(first.get(10, TimeUnit.SECONDS)).isEqualTo(200);
             assertThat(second.get(10, TimeUnit.SECONDS)).isEqualTo(200);
         }
-        mvc.perform(post("/api/payments/" + id + "/confirm"))
+        mvc.perform(post("/api/payments/by-order/" + orderId + "/reject"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paymentId").value(id.toString()))
+                .andExpect(jsonPath("$.orderId").value(orderId.toString()))
                 .andExpect(jsonPath("$.status").value("SUCCEEDED"));
         assertThat(outbox.findAll()).singleElement().satisfies(event -> {
             assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.NEW);
@@ -98,16 +102,73 @@ class PaymentScenariosIntegrationTest {
             assertThat(result.paymentId()).isEqualTo(id);
             assertThat(result.totalPrice()).isEqualByComparingTo("150.00");
         });
-        mvc.perform(post("/api/payments/" + UUID.randomUUID() + "/confirm"))
+        mvc.perform(post("/api/payments/by-order/" + UUID.randomUUID() + "/confirm"))
+                .andExpect(status().isNotFound());
+        mvc.perform(post("/api/payments/by-order/" + id + "/confirm"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    void expiredPaymentCannotBeConfirmed_andFailureIsPublishedOnce() throws Exception {
+    void rejectedPaymentCannotBeConfirmed_andFailureIsPublishedOnce() throws Exception {
         var id = createPayment();
+        var orderId = payments.findById(id).orElseThrow().getOrderId();
+        for (int i = 0; i < 2; i++) {
+            mvc.perform(post("/api/payments/by-order/" + orderId + "/reject"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.paymentId").value(id.toString()))
+                    .andExpect(jsonPath("$.orderId").value(orderId.toString()))
+                    .andExpect(jsonPath("$.status").value("FAILED"))
+                    .andExpect(jsonPath("$.failureCode").value("DECLINED"));
+        }
+        mvc.perform(post("/api/payments/by-order/" + orderId + "/confirm"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"));
+        assertThat(outbox.findAll()).singleElement().satisfies(event -> {
+            assertThat(event.getAggregateId()).isEqualTo(orderId);
+            var failure = (PaymentFailed) parser.parse(event.getPayload());
+            assertThat(failure.paymentId()).isEqualTo(id);
+            assertThat(failure.failureCode()).isEqualTo("DECLINED");
+        });
+        mvc.perform(post("/api/payments/by-order/" + UUID.randomUUID() + "/reject"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void concurrentConfirmationAndRejectionPublishOnlyWinningResult() throws Exception {
+        var id = createPayment();
+        var orderId = payments.findById(id).orElseThrow().getOrderId();
+        CountDownLatch start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var confirm = executor.submit(() -> completeAfterStart(orderId, "confirm", start));
+            var reject = executor.submit(() -> completeAfterStart(orderId, "reject", start));
+            start.countDown();
+            assertThat(confirm.get(10, TimeUnit.SECONDS)).isEqualTo(200);
+            assertThat(reject.get(10, TimeUnit.SECONDS)).isEqualTo(200);
+        }
+        var payment = payments.findById(id).orElseThrow();
+        assertThat(payment.getStatus()).isIn(PaymentStatus.SUCCEEDED, PaymentStatus.FAILED);
+        assertThat(outbox.findAll()).singleElement().satisfies(event -> {
+            var result = parser.parse(event.getPayload());
+            if (payment.getStatus() == PaymentStatus.SUCCEEDED) {
+                assertThat(result).isInstanceOfSatisfying(PaymentSucceeded.class,
+                        success -> assertThat(success.paymentId()).isEqualTo(id));
+            } else {
+                assertThat(result).isInstanceOfSatisfying(PaymentFailed.class, failure -> {
+                    assertThat(failure.paymentId()).isEqualTo(id);
+                    assertThat(failure.failureCode()).isEqualTo("DECLINED");
+                });
+            }
+        });
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"confirm", "reject"})
+    void expiredPaymentKeepsExpirationReason_andFailureIsPublishedOnce(String action) throws Exception {
+        var id = createPayment();
+        var orderId = payments.findById(id).orElseThrow().getOrderId();
         when(clock.instant()).thenReturn(NOW.plusSeconds(901));
         for (int i = 0; i < 2; i++) {
-            mvc.perform(post("/api/payments/" + id + "/confirm"))
+            mvc.perform(post("/api/payments/by-order/" + orderId + "/" + action))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("FAILED"))
                     .andExpect(jsonPath("$.failureCode").value("SESSION_EXPIRED"));
@@ -119,20 +180,22 @@ class PaymentScenariosIntegrationTest {
         });
     }
 
-    @Test
-    void outboxFailureRollsBackConfirmation_andRequestCanBeRetried() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"confirm", "reject"})
+    void outboxFailureRollsBackCompletion_andRequestCanBeRetried(String action) throws Exception {
         var id = createPayment();
+        var orderId = payments.findById(id).orElseThrow().getOrderId();
         doThrow(new IllegalStateException("Simulated database failure")).when(outbox).save(any());
-        mvc.perform(post("/api/payments/" + id + "/confirm"))
+        mvc.perform(post("/api/payments/by-order/" + orderId + "/" + action))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.detail").value("Internal server error"));
         assertThat(payments.findById(id).orElseThrow().getStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(outbox.count()).isZero();
 
         reset(outbox);
-        mvc.perform(post("/api/payments/" + id + "/confirm"))
+        mvc.perform(post("/api/payments/by-order/" + orderId + "/" + action))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("SUCCEEDED"));
+                .andExpect(jsonPath("$.status").value(action.equals("confirm") ? "SUCCEEDED" : "FAILED"));
         assertThat(outbox.count()).isEqualTo(1);
     }
 
@@ -143,10 +206,11 @@ class PaymentScenariosIntegrationTest {
         return payments.findByOrderIdAndAttemptNumber(event.orderId(), 1).orElseThrow().getId();
     }
 
-    private int confirmAfterStart(UUID id, CountDownLatch start) throws Exception {
+    private int completeAfterStart(UUID orderId, String action, CountDownLatch start) throws Exception {
         if (!start.await(5, TimeUnit.SECONDS)) {
-            throw new IllegalStateException("Concurrent confirmation did not start");
+            throw new IllegalStateException("Concurrent payment completion did not start");
         }
-        return mvc.perform(post("/api/payments/" + id + "/confirm")).andReturn().getResponse().getStatus();
+        return mvc.perform(post("/api/payments/by-order/" + orderId + "/" + action))
+                .andReturn().getResponse().getStatus();
     }
 }

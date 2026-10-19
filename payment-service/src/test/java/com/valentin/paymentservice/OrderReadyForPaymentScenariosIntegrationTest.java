@@ -123,7 +123,8 @@ class OrderReadyForPaymentScenariosIntegrationTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$[0].paymentId").value(payment.getId().toString()));
 
-            mvc.perform(post("/api/payments/" + payment.getId() + "/confirm")).andExpect(status().isOk());
+            mvc.perform(post("/api/payments/by-order/" + payment.getOrderId() + "/confirm"))
+                    .andExpect(status().isOk());
             poller.pollAndPublish();
             var success = (PaymentSucceeded) parser.parse(receive(results, event.orderId().toString()).value());
             assertThat(success.paymentId()).isEqualTo(payment.getId());

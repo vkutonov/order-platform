@@ -19,14 +19,18 @@ public class KafkaConsumerConfig {
     public DefaultErrorHandler kafkaErrorHandler(
             KafkaTemplate<String, String> kafkaTemplate,
             @Value("${app.kafka.topics.inventory-events-dlt}")
-            String dltTopic
+            String inventoryDltTopic,
+            @Value("${app.kafka.topics.payment-events}")
+            String paymentTopic,
+            @Value("${app.kafka.topics.payment-events-dlt}")
+            String paymentDltTopic
     ) {
 
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
                 kafkaTemplate,
                 (record, exception) ->
                         new TopicPartition(
-                                dltTopic,
+                                paymentTopic.equals(record.topic()) ? paymentDltTopic : inventoryDltTopic,
                                 record.partition()
                         )
 
