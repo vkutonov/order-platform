@@ -1,5 +1,6 @@
 package com.valentin.inventoryservice.logic;
 
+import com.valentin.inventoryservice.api.ProductController;
 import com.valentin.inventoryservice.db.InventoryItemRepository;
 import com.valentin.inventoryservice.db.ProductRepository;
 import com.valentin.inventoryservice.domain.InventoryItemEntity;
@@ -15,6 +16,8 @@ import com.valentin.inventoryservice.mapper.ProductMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mapstruct.factory.Mappers;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -29,6 +32,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class ProductServiceTest {
 
@@ -55,6 +60,49 @@ class ProductServiceTest {
                 inventoryProductMapper,
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
+    }
+
+    @Test
+    void getAllProductsReturnsDetailsAndMatchingStock_andEmptyCatalogReturnsEmptyList() throws Exception {
+        UUID secondProductId = UUID.randomUUID();
+        ProductEntity firstProduct = product(PRODUCT_ID);
+        ProductEntity secondProduct = product(secondProductId);
+        when(firstProduct.getDescription()).thenReturn("Mechanical keyboard");
+        when(secondProduct.getName()).thenReturn("Mouse");
+        when(secondProduct.getStatus()).thenReturn(ProductStatus.INACTIVE);
+        InventoryItemEntity firstItem = InventoryItemEntity.create(PRODUCT_ID, 8, NOW);
+        firstItem.reserve(3, NOW);
+        InventoryItemEntity secondItem = InventoryItemEntity.create(secondProductId, 0, NOW);
+        when(productRepository.findAllByStatusNot(ProductStatus.DELETED)).thenReturn(List.of(firstProduct, secondProduct));
+        when(inventoryItemRepository.findAllByProductIdIn(List.of(PRODUCT_ID, secondProductId)))
+                .thenReturn(List.of(secondItem, firstItem));
+
+        ProductService service = new ProductService(productRepository, inventoryItemRepository, productMapper,
+                Mappers.getMapper(InventoryProductMapper.class), Clock.fixed(NOW, ZoneOffset.UTC));
+        var mvc = MockMvcBuilders.standaloneSetup(new ProductController(service)).build();
+        mvc.perform(get("/api/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].productId").value(PRODUCT_ID.toString()))
+                .andExpect(jsonPath("$[0].name").value("Keyboard"))
+                .andExpect(jsonPath("$[0].description").value("Mechanical keyboard"))
+                .andExpect(jsonPath("$[0].unitPrice").value(5000))
+                .andExpect(jsonPath("$[0].currency").value("RUB"))
+                .andExpect(jsonPath("$[0].status").value("ACTIVE"))
+                .andExpect(jsonPath("$[0].quantityOnHand").value(8))
+                .andExpect(jsonPath("$[0].reservedQuantity").value(3))
+                .andExpect(jsonPath("$[0].availableQuantity").value(5))
+                .andExpect(jsonPath("$[1].productId").value(secondProductId.toString()))
+                .andExpect(jsonPath("$[1].name").value("Mouse"))
+                .andExpect(jsonPath("$[1].status").value("INACTIVE"))
+                .andExpect(jsonPath("$[1].availableQuantity").value(0));
+
+        when(productRepository.findAllByStatusNot(ProductStatus.DELETED)).thenReturn(List.of());
+        mvc.perform(get("/api/products"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
+        verify(inventoryItemRepository).findAllByProductIdIn(List.of(PRODUCT_ID, secondProductId));
+        verifyNoMoreInteractions(inventoryItemRepository);
     }
 
     @Test

@@ -44,6 +44,14 @@ public class ProductEntity {
     private Instant updatedAt;
 
 
+    public void markDeleted(Instant now) {
+        if (status == ProductStatus.DELETED) {
+            return;
+        }
+        status = ProductStatus.DELETED;
+        updatedAt = now;
+    }
+
     public static ProductEntity create(
             String name,
             String description,
