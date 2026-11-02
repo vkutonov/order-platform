@@ -159,7 +159,9 @@ class PaymentScenariosIntegrationTest {
             assertThat(result.totalPrice()).isEqualByComparingTo("150.00");
         });
         mvc.perform(post("/api/payments/by-order/" + UUID.randomUUID() + "/confirm"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PAYMENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Payment not found"));
         mvc.perform(post("/api/payments/by-order/" + id + "/confirm"))
                 .andExpect(status().isNotFound());
     }
@@ -244,7 +246,8 @@ class PaymentScenariosIntegrationTest {
         doThrow(new IllegalStateException("Simulated database failure")).when(outbox).save(any());
         mvc.perform(post("/api/payments/by-order/" + orderId + "/" + action))
                 .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.detail").value("Internal server error"));
+                .andExpect(jsonPath("$.code").value("INTERNAL_SERVER_ERROR"))
+                .andExpect(jsonPath("$.message").value("Internal server error"));
         assertThat(payments.findById(id).orElseThrow().getStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(outbox.count()).isZero();
 
