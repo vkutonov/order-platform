@@ -6,11 +6,13 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.web.MockHttpServletRequest;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -42,8 +44,9 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().code()).isEqualTo("PRODUCT_NOT_FOUND");
         assertThat(response.getBody().message())
-                .isEqualTo("Product not found: productId=" + PRODUCT_ID);
+                .isEqualTo("Некоторые товары не найдены");
         assertThat(response.getBody().timestamp()).isEqualTo(NOW);
+        assertThat(response.getBody().missingProductIds()).containsExactly(PRODUCT_ID);
     }
 
     @Test
@@ -83,5 +86,29 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().code()).isEqualTo("INVALID_REQUEST_BODY");
         assertThat(response.getBody().message()).isEqualTo("Request body is missing or malformed");
+    }
+    @Test
+    void missingProductsReturnsEveryMissingIdAndOmitsEmptyFields() {
+        UUID anotherId = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        var response = handler.handleInventoryServiceException(
+                new ProductNotFoundException(Set.of(anotherId, PRODUCT_ID)),
+                request
+        );
+
+        assertThat(response.getBody().missingProductIds()).containsExactly(PRODUCT_ID, anotherId);
+        assertThat(new JsonMapper().writeValueAsString(response.getBody()))
+                .doesNotContain("\"error\":", "\"fieldErrors\":")
+                .contains("\"missingProductIds\":");
+    }
+
+    @Test
+    void otherErrorsOmitMissingProductIds() {
+        var response = handler.handleConcurrentStockModification(
+                new OptimisticLockingFailureException("Internal persistence details"),
+                request
+        );
+
+        assertThat(new JsonMapper().writeValueAsString(response.getBody()))
+                .doesNotContain("\"error\":", "\"fieldErrors\":", "\"missingProductIds\":");
     }
 }

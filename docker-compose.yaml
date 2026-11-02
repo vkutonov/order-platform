@@ -70,6 +70,39 @@ services:
       retries: 10
 
 
+  payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+
+    image: payment-service:local
+
+    ports:
+      - "127.0.0.1:${PAYMENT_SERVICE_PORT:-8083}:8083"
+
+    environment:
+      PAYMENT_DB_HOST: payment-postgres
+      PAYMENT_DB_PORT: 5432
+      PAYMENT_DB_NAME: ${PAYMENT_DB_NAME}
+      PAYMENT_DB_USERNAME: ${PAYMENT_DB_USERNAME}
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+
+    depends_on:
+      payment-postgres:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+
+    security_opt:
+      - no-new-privileges:true
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   order-postgres:
     image: postgres:18.4-bookworm
     container_name: order-postgres
@@ -100,6 +133,23 @@ services:
       - inventory-postgres-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${INVENTORY_DB_USERNAME} -d ${INVENTORY_DB_NAME}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  payment-postgres:
+    image: postgres:18.4-bookworm
+    container_name: payment-postgres
+    environment:
+      POSTGRES_DB: ${PAYMENT_DB_NAME}
+      POSTGRES_USER: ${PAYMENT_DB_USERNAME}
+      POSTGRES_PASSWORD: ${PAYMENT_DB_PASSWORD}
+    ports:
+      - "127.0.0.1:${PAYMENT_DB_PORT}:5432"
+    volumes:
+      - payment-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PAYMENT_DB_USERNAME:-payment_user} -d ${PAYMENT_DB_NAME:-payment_db}"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -179,9 +229,12 @@ services:
       /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --if-not-exists --topic inventory.events --partitions 3 --replication-factor 1 &&
       /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --if-not-exists --topic payment.events --partitions 3 --replication-factor 1 &&
       /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --if-not-exists --topic order.events.inventory-service.dlt --partitions 3 --replication-factor 1 &&
-      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --if-not-exists --topic inventory.events.order-service.dlt --partitions 3 --replication-factor 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --if-not-exists --topic order.events.payment-service.dlt --partitions 3 --replication-factor 1 &&
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --if-not-exists --topic inventory.events.order-service.dlt --partitions 3 --replication-factor 1 &&
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --if-not-exists --topic payment.events.order-service.dlt --partitions 3 --replication-factor 1
       "
 
 volumes:
   order-postgres-data:
   inventory-postgres-data:
+  payment-postgres-data:

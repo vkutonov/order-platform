@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @AllArgsConstructor
@@ -20,6 +21,13 @@ public class ProductController {
 
     private final ProductService productService;
 
+    @GetMapping
+    public ResponseEntity<List<InventoryProductResponse>> getAllProducts() {
+        List<InventoryProductResponse> products = productService.findAllProducts();
+
+        return ResponseEntity.ok(products);
+    }
+
     @PostMapping
     public ResponseEntity<ProductResponse> createProduct(
             @Valid @RequestBody CreateProductRequest request
@@ -27,6 +35,12 @@ public class ProductController {
         ProductResponse response = productService.create(request);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteProduct(@PathVariable UUID id) {
+        productService.deleteProduct(id);
     }
 
     @PostMapping("/{id}/stock")

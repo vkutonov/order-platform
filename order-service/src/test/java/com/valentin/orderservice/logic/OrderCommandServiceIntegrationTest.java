@@ -8,6 +8,7 @@ import com.valentin.orderservice.domain.OrderEntity;
 import com.valentin.orderservice.domain.OrderHistoryEntity;
 import com.valentin.orderservice.domain.dictionary.OrderStatus;
 import com.valentin.orderservice.mapper.OrderMapper;
+import com.valentin.orderservice.messaging.event.OrderReadyForPaymentEvent;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -27,6 +28,8 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(
@@ -34,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 )
 @Import({
         OrderCommandService.class,
+        com.valentin.orderservice.messaging.outbox.OutboxEventService.class,
         TimeConfig.class
 })
 @Testcontainers
@@ -83,6 +87,9 @@ public class OrderCommandServiceIntegrationTest {
         );
 
         orderRepository.save(order);
+
+        when(objectMapper.writeValueAsString(any(OrderReadyForPaymentEvent.class)))
+                .thenReturn("{}");
 
         orderCommandService.reserveInventory(order.getId());
 

@@ -34,6 +34,29 @@ public class ProductService {
     private final InventoryProductMapper inventoryProductMapper;
     private final Clock clock;
 
+    @Transactional(readOnly = true)
+    public List<InventoryProductResponse> findAllProducts() {
+        List<ProductEntity> products = productRepository.findAllByStatusNot(ProductStatus.DELETED);
+        if (products.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> productIds = products.stream().map(ProductEntity::getId).toList();
+        Map<UUID, InventoryItemEntity> items = inventoryItemRepository.findAllByProductIdIn(productIds)
+                .stream()
+                .collect(Collectors.toMap(InventoryItemEntity::getProductId, Function.identity()));
+
+        return products.stream()
+                .map(product -> {
+                    InventoryItemEntity item = items.get(product.getId());
+                    if (item == null) {
+                        throw new ProductNotFoundException(product.getId());
+                    }
+                    return inventoryProductMapper.toResponse(product, item);
+                })
+                .toList();
+    }
+
     @Transactional
     public ProductResponse create(CreateProductRequest productRequest) {
 
@@ -66,6 +89,19 @@ public class ProductService {
 
 
         return productMapper.toProductResponse(savedProduct);
+    }
+
+    @Transactional
+    public void deleteProduct(UUID productId) {
+        ProductEntity product = productRepository.findById(productId)
+                .orElseThrow(() -> new ProductNotFoundException(productId));
+        if (product.getStatus() == ProductStatus.DELETED) {
+            return;
+        }
+
+        product.markDeleted(clock.instant());
+
+        log.info("Product deleted: productId={}", productId);
     }
 
 
@@ -134,8 +170,8 @@ public class ProductService {
 
 
     private ProductEntity findProduct(UUID id) {
-        return productRepository.findById(id).orElseThrow(() ->
-                new ProductNotFoundException(id)
-        );
+        return productRepository.findById(id)
+                .filter(product -> product.getStatus() != ProductStatus.DELETED)
+                .orElseThrow(() -> new ProductNotFoundException(id));
     }
 }

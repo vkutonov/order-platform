@@ -194,7 +194,7 @@ class OrderControllerIntegrationTest {
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(404))
-                .andExpect(jsonPath("$.error").value("Not Found"))
+                .andExpect(jsonPath("$.error").doesNotExist())
                 .andExpect(jsonPath("$.message").value("Order not found id = " + orderId))
                 .andExpect(jsonPath("$.path").value("/api/orders/" + orderId));
     }
@@ -252,7 +252,7 @@ class OrderControllerIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.error").doesNotExist())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.message").value("Request validation failed"))
                 .andExpect(jsonPath("$.path").value("/api/orders"))

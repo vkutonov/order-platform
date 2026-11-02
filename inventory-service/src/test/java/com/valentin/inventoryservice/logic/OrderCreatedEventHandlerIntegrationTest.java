@@ -11,6 +11,7 @@ import com.valentin.inventoryservice.domain.dictionary.ProductStatus;
 import com.valentin.inventoryservice.exception.ProductNotFoundException;
 import com.valentin.inventoryservice.messaging.event.OrderCreatedEvent;
 import com.valentin.inventoryservice.messaging.event.OrderCreatedItem;
+import com.valentin.inventoryservice.messaging.outbox.OutboxEventPoller;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -34,7 +35,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest(properties = "server.port=0")
+@SpringBootTest(properties = {"server.port=0", "spring.kafka.listener.auto-startup=false"})
 @Testcontainers
 class OrderCreatedEventHandlerIntegrationTest {
 
@@ -80,6 +81,9 @@ class OrderCreatedEventHandlerIntegrationTest {
 
     @MockitoBean
     private OutboxEventRepository outboxEventRepository;
+
+    @MockitoBean
+    private OutboxEventPoller outboxEventPoller;
 
     @Test
     void handle_whenReservationFails_shouldRollbackProcessedEvent() {

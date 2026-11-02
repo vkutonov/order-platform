@@ -1,0 +1,76 @@
+server:
+  port: ${PAYMENT_SERVICE_PORT:8083}
+
+spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+
+  application:
+    name: payment-service
+
+  datasource:
+    url: jdbc:postgresql://${PAYMENT_DB_HOST:localhost}:${PAYMENT_DB_PORT:5435}/${PAYMENT_DB_NAME:payment_db}
+    username: ${PAYMENT_DB_USERNAME}
+    password: ${PAYMENT_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      client-id: payment-service-outbox-producer
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        "[enable.idempotence]": true
+        "[delivery.timeout.ms]": 30000
+        "[request.timeout.ms]": 10000
+        "[max.block.ms]": 5000
+    consumer:
+      group-id: payment-order-events-v1
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      max-poll-records: 50
+    listener:
+      type: single
+      ack-mode: batch
+      concurrency: 1
+
+app:
+  payment:
+    expiration-minutes: 15
+    expiration:
+      enabled: true
+      check-delay-ms: 10000
+  kafka:
+    topics:
+      order-events: order.events
+      payment-events: payment.events
+      order-events-dlt: order.events.payment-service.dlt
+  outbox:
+    polling:
+      enabled: true
+      batch-size: 50
+      fixed-delay-ms: 5000
+      processing-timeout-ms: 60000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

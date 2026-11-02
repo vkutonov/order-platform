@@ -11,9 +11,12 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientException;
 
 import java.time.Clock;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @RestControllerAdvice
@@ -21,6 +24,8 @@ import java.util.List;
 public class GlobalExceptionHandler {
 
     private static final String INTERNAL_SERVER_ERROR_MESSAGE = "Internal server error";
+
+    private static final String MISSING_PRODUCTS_MESSAGE = "Order creation failed, products missed";
 
     private final Clock clock;
 
@@ -30,6 +35,12 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         ApiErrorCode errorCode = exception.getErrorCode();
+        List<UUID> missingProductIds = exception instanceof ProductNotFoundException productNotFound
+                ? productNotFound.getProductIds().stream().sorted().toList()
+                : List.of();
+        String message = exception instanceof ProductNotFoundException
+                ? MISSING_PRODUCTS_MESSAGE
+                : exception.getMessage();
 
         log.warn(
                 "Order operation failed: path={}, code={}, message={}",
@@ -40,9 +51,10 @@ public class GlobalExceptionHandler {
 
         return clientErrorResponse(
                 errorCode,
-                exception.getMessage(),
+                message,
                 request,
-                List.of()
+                List.of(),
+                missingProductIds
         );
     }
 
@@ -137,6 +149,41 @@ public class GlobalExceptionHandler {
     }
 
 
+    @ExceptionHandler(HttpClientErrorException.NotFound.class)
+    public ResponseEntity<?> handleInventoryNotFound(
+            HttpClientErrorException.NotFound exception,
+            HttpServletRequest request
+    ) {
+        ClientErrorResponse inventoryError;
+        try {
+            inventoryError = exception.getResponseBodyAs(ClientErrorResponse.class);
+        } catch (RestClientException invalidResponse) {
+            return handleUnexpectedException(exception, request);
+        }
+
+        if (inventoryError == null
+                || !ApiErrorCode.PRODUCT_NOT_FOUND.name().equals(inventoryError.code())) {
+            return handleUnexpectedException(exception, request);
+        }
+
+        List<UUID> missingProductIds = inventoryError.missingProductIds() != null
+                ? inventoryError.missingProductIds()
+                : List.of();
+
+        log.warn(
+                "Product not found: path={}, missingProductIds={}",
+                request.getRequestURI(),
+                missingProductIds
+        );
+
+        return clientErrorResponse(
+                ApiErrorCode.PRODUCT_NOT_FOUND,
+                MISSING_PRODUCTS_MESSAGE,
+                request,
+                List.of(),
+                missingProductIds
+        );
+    }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ServerErrorResponse> handleUnexpectedException(
             Exception exception,
@@ -153,7 +200,7 @@ public class GlobalExceptionHandler {
         ServerErrorResponse response = new ServerErrorResponse(
                 clock.instant(),
                 status.value(),
-                status.getReasonPhrase(),
+                "INTERNAL_SERVER_ERROR",
                 INTERNAL_SERVER_ERROR_MESSAGE,
                 request.getRequestURI()
         );
@@ -169,14 +216,24 @@ public class GlobalExceptionHandler {
             HttpServletRequest request,
             List<FieldErrorResponse> fieldErrors
     ) {
+        return clientErrorResponse(errorCode, message, request, fieldErrors, List.of());
+    }
+
+    private ResponseEntity<ClientErrorResponse> clientErrorResponse(
+            ApiErrorCode errorCode,
+            String message,
+            HttpServletRequest request,
+            List<FieldErrorResponse> fieldErrors,
+            List<UUID> missingProductIds
+    ) {
         HttpStatus status = errorCode.status();
         ClientErrorResponse response = new ClientErrorResponse(
                 clock.instant(),
                 status.value(),
-                status.getReasonPhrase(),
                 errorCode.name(),
                 message,
                 request.getRequestURI(),
+                missingProductIds,
                 fieldErrors
         );
 

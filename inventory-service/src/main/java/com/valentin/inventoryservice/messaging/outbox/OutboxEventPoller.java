@@ -1,8 +1,8 @@
 package com.valentin.inventoryservice.messaging.outbox;
 
 import com.valentin.inventoryservice.domain.OutboxEventEntity;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -11,16 +11,17 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 import static java.lang.Thread.currentThread;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class OutboxEventPoller {
 
     private final OutboxKafkaPublisher outboxKafkaPublisher;
     private final OutboxEventService outboxEventService;
+    private final Executor outboxExecutor;
 
     @Value("${app.outbox.polling.batch-size}")
     private int batchSize;
@@ -29,6 +30,18 @@ public class OutboxEventPoller {
     private long processingTimeout;
 
     private final Clock clock;
+
+    public OutboxEventPoller(
+            OutboxKafkaPublisher outboxKafkaPublisher,
+            OutboxEventService outboxEventService,
+            Clock clock,
+            @Qualifier("outboxExecutor") Executor outboxExecutor
+    ) {
+        this.outboxKafkaPublisher = outboxKafkaPublisher;
+        this.outboxEventService = outboxEventService;
+        this.clock = clock;
+        this.outboxExecutor = outboxExecutor;
+    }
 
     public void pollAndPublish() {
         if (currentThread().isInterrupted()) {
@@ -62,7 +75,7 @@ public class OutboxEventPoller {
 
     private CompletableFuture<?> publishEvent(OutboxEventEntity event) {
         return outboxKafkaPublisher.publish(event)
-                .handle((result, exception) -> {
+                .handleAsync((result, exception) -> {
                     if (exception == null) {
                         outboxEventService.markPublished(event.getId(), clock.instant());
 
@@ -87,7 +100,7 @@ public class OutboxEventPoller {
                     }
 
                     return null;
-                });
+                }, outboxExecutor);
     }
 
 }

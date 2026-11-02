@@ -31,7 +31,7 @@ jobs:
         service:
           - order-service
           - inventory-service
-          # - payment-service
+          - payment-service
           # - notification-service
           # - api-gateway
 
@@ -101,8 +101,14 @@ jobs:
       INVENTORY_DB_PASSWORD: inventory_password
       INVENTORY_DB_PORT: 5434
 
+      PAYMENT_DB_NAME: payment_db
+      PAYMENT_DB_USERNAME: payment_user
+      PAYMENT_DB_PASSWORD: payment_password
+      PAYMENT_DB_PORT: 5435
+
       ORDER_SERVICE_PORT: 8081
       INVENTORY_SERVICE_PORT: 8082
+      PAYMENT_SERVICE_PORT: 8083
 
       KAFKA_EXTERNAL_PORT: 9092
       KAFKA_UI_PORT: 8080
@@ -113,12 +119,44 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
+        id: buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Cache Gradle directories used by Docker
+        id: docker-gradle-cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/buildkit-gradle
+          key: ${{ runner.os }}-${{ runner.arch }}-docker-gradle-v1-${{ hashFiles('**/*.gradle', '**/gradle-wrapper.properties', '**/gradle.properties', '**/Dockerfile') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-docker-gradle-v1-
+
+      - name: Restore and extract Gradle cache mounts
+        uses: reproducible-containers/buildkit-cache-dance@5422eac04292c961a382e0f584ea0f03ad9da723 # v3.4.0
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          utility-image: busybox:1.37.0
+          scratch-dir: ${{ runner.temp }}/buildkit-cache-dance
+          cache-map: |
+            {
+              "${{ runner.temp }}/buildkit-gradle/order-service": {
+                "id": "order-service-gradle", "target": "/root/.gradle", "sharing": "locked"
+              },
+              "${{ runner.temp }}/buildkit-gradle/inventory-service": {
+                "id": "inventory-service-gradle", "target": "/root/.gradle", "sharing": "locked"
+              },
+              "${{ runner.temp }}/buildkit-gradle/payment-service": {
+                "id": "payment-service-gradle", "target": "/root/.gradle", "sharing": "locked"
+              }
+            }
+          skip-extraction: ${{ steps.docker-gradle-cache.outputs.cache-hit }}
 
       - name: Validate Compose configuration
         run: make config
 
       - name: Build and start stack
+        env:
+          BUILDX_BUILDER: ${{ steps.buildx.outputs.name }}
         run: make ci-up-build
 
       - name: Show logs on failure

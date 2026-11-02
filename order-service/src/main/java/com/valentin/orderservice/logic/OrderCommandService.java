@@ -11,6 +11,9 @@ import com.valentin.orderservice.domain.dictionary.OrderChangeHistoryReason;
 import com.valentin.orderservice.domain.dictionary.OrderStatus;
 import com.valentin.orderservice.domain.dictionary.ReservationFailureCode;
 import com.valentin.orderservice.messaging.event.OrderCreatedEvent;
+import com.valentin.orderservice.messaging.event.OrderReadyForPaymentEvent;
+import com.valentin.orderservice.messaging.event.OrderLifecycleEvent;
+import com.valentin.orderservice.messaging.outbox.OutboxEventService;
 import com.valentin.orderservice.dto.*;
 import com.valentin.orderservice.exception.OrderNotFoundException;
 import com.valentin.orderservice.mapper.OrderMapper;
@@ -42,6 +45,7 @@ public class OrderCommandService {
     private final ObjectMapper objectMapper;
 
     private final OutboxEventRepository outboxEventRepository;
+    private final OutboxEventService outbox;
 
 
     @Transactional
@@ -128,6 +132,10 @@ public class OrderCommandService {
     @Transactional
     public void reserveInventory(UUID orderId) {
         OrderEntity order = findOrder(orderId);
+        if (order.getStatus() != OrderStatus.WAITING_FOR_INVENTORY) {
+            log.debug("Inventory result skipped: orderId={}, status={}", orderId, order.getStatus());
+            return;
+        }
         Instant timeNow = clock.instant();
 
         OrderStatus oldStatus = order.getStatus();
@@ -142,6 +150,25 @@ public class OrderCommandService {
                 timeNow
         );
 
+        UUID eventId = UUID.randomUUID();
+        OrderReadyForPaymentEvent paymentEvent = OrderReadyForPaymentEvent.of(
+                eventId,
+                order.getId(),
+                order.getUserId(),
+                order.getTotalPrice(),
+                order.getCurrency(),
+                timeNow
+        );
+
+        outboxEventRepository.save(OutboxEventEntity.create(
+                eventId,
+                "Order",
+                order.getId(),
+                paymentEvent.eventType(),
+                objectMapper.writeValueAsString(paymentEvent),
+                timeNow
+        ));
+
         log.info(
                 "Order inventory reserved: orderId={}, oldStatus={}, newStatus={}",
                 orderId,
@@ -154,11 +181,16 @@ public class OrderCommandService {
     @Transactional
     public void inventoryReservationFailed(UUID orderId, ReservationFailureCode failureCode) {
         OrderEntity order = findOrder(orderId);
+        if (order.getStatus() != OrderStatus.WAITING_FOR_INVENTORY) {
+            log.debug("Inventory failure skipped: orderId={}, status={}", orderId, order.getStatus());
+            return;
+        }
         Instant timeNow = clock.instant();
 
         OrderStatus oldStatus = order.getStatus();
 
         order.markInventoryReservationFailed(timeNow);
+        outbox.enqueue(OrderLifecycleEvent.of(OrderLifecycleEvent.CANCELLED, orderId, timeNow));
 
         switch (failureCode) {
             case INSUFFICIENT_STOCK ->  saveStatusHistory(
@@ -187,66 +219,18 @@ public class OrderCommandService {
         );
 
     }
-
-
-    @Transactional
-    public void markPaymentSucceeded(UUID orderId) {
-        OrderEntity order = findOrder(orderId);
-
-        OrderStatus oldStatus = order.getStatus();
-        Instant timeNow = clock.instant();
-
-        order.markPaymentSucceeded(timeNow);
-
-        saveStatusHistory(
-                order,
-                oldStatus,
-                order.getStatus(),
-                OrderChangeHistoryReason.PAYMENT_SUCCEEDED,
-                timeNow
-        );
-
-        log.info(
-                "Order payment succeeded: orderId={}, oldStatus={}, newStatus={}",
-                orderId,
-                oldStatus,
-                order.getStatus()
-        );
-    }
-
-    @Transactional
-    public void markPaymentFailed(UUID orderId) {
-        OrderEntity order = findOrder(orderId);
-
-        OrderStatus oldStatus = order.getStatus();
-        Instant timeNow = clock.instant();
-
-        order.markPaymentFailed(timeNow);
-
-        saveStatusHistory(
-                order,
-                oldStatus,
-                order.getStatus(),
-                OrderChangeHistoryReason.PAYMENT_FAILED,
-                timeNow
-        );
-
-        log.info(
-                "Order payment failed: orderId={}, oldStatus={}, newStatus={}",
-                orderId,
-                oldStatus,
-                order.getStatus()
-        );
-    }
-
     @Transactional
     public void cancelOrder(UUID orderId) {
         OrderEntity order = findOrder(orderId);
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            return;
+        }
 
         OrderStatus oldStatus = order.getStatus();
         Instant timeNow = clock.instant();
 
         order.cancel(timeNow);
+        outbox.enqueue(OrderLifecycleEvent.of(OrderLifecycleEvent.CANCELLED, orderId, timeNow));
 
         saveStatusHistory(
                 order,
@@ -286,7 +270,7 @@ public class OrderCommandService {
 
 
     private OrderEntity findOrder(UUID id) {
-        return orderRepository.findById(id).orElseThrow(() ->
+        return orderRepository.findByIdForUpdate(id).orElseThrow(() ->
                 new OrderNotFoundException("Order not found id = " + id)
         );
     }

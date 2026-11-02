@@ -49,6 +49,9 @@ spring:
 
       properties:
         enable.idempotence: true
+        "[delivery.timeout.ms]": 30000
+        "[request.timeout.ms]": 10000
+        "[max.block.ms]": 5000
 
     listener:
       type: single

@@ -53,21 +53,6 @@ public class OrderController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // Temporary endpoints for simulating Service events.
-    // Will be replaced by Kafka consumer.
-
-    @PostMapping("/{id}/payment-success")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void confirmPayment(@PathVariable UUID id) {
-        orderCommandService.markPaymentSucceeded(id);
-    }
-
-    @PostMapping("/{id}/payment-failed")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void paymentFailed(@PathVariable UUID id) {
-        orderCommandService.markPaymentFailed(id);
-    }
-
     @PostMapping("/{id}/cancel")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void cancelOrder(@PathVariable UUID id) {
