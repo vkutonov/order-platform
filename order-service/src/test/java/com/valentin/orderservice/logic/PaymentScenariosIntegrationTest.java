@@ -4,6 +4,7 @@ import com.valentin.orderservice.db.OrderHistoryRepository;
 import com.valentin.orderservice.db.OrderRepository;
 import com.valentin.orderservice.db.PaymentResultRepository;
 import com.valentin.orderservice.db.ProcessedEventRepository;
+import com.valentin.orderservice.db.OutboxEventRepository;
 import com.valentin.orderservice.domain.OrderEntity;
 import com.valentin.orderservice.domain.OrderItemEntity;
 import com.valentin.orderservice.domain.dictionary.OrderChangeHistoryReason;
@@ -97,12 +98,14 @@ class PaymentScenariosIntegrationTest {
     @Autowired private MockMvc mvc;
     @MockitoSpyBean private PaymentEventHandler handler;
     @MockitoSpyBean private OrderHistoryRepository history;
+    @MockitoSpyBean private OutboxEventRepository outbox;
+    @Autowired private OrderCommandService commands;
     @MockitoBean private OutboxEventPoller poller;
     @MockitoBean private Clock clock;
 
     @BeforeEach
     void prepare() {
-        reset(history, handler);
+        reset(history, handler, outbox);
         when(clock.instant()).thenReturn(NOW);
         ContainerTestUtils.waitForAssignment(listeners.getListenerContainer("paymentResults"), 3);
         jdbc.execute("TRUNCATE order_payment_results, order_status_history, order_items, orders, processed_events, outbox_events");
@@ -121,6 +124,10 @@ class PaymentScenariosIntegrationTest {
             assertThat(orderStatus(order)).isEqualTo(OrderStatus.PAID);
         });
         assertThat(results.count()).isEqualTo(1);
+        assertThat(outbox.findAll()).singleElement().satisfies(eventRow -> {
+            assertThat(eventRow.getEventType()).isEqualTo("OrderPaidEvent");
+            assertThat(eventRow.getAggregateId()).isEqualTo(order.getId());
+        });
         assertThat(history.findAll()).singleElement().satisfies(change -> {
             assertThat(change.getOldStatus()).isEqualTo(OrderStatus.WAITING_FOR_PAYMENT);
             assertThat(change.getNewStatus()).isEqualTo(OrderStatus.PAID);
@@ -146,21 +153,23 @@ class PaymentScenariosIntegrationTest {
     }
 
     @Test
-    void failedAttemptKeepsOrderWaiting_andConflictingFinalResultReachesDlt() throws Exception {
+    void failedAttemptCancelsOrderOnce_andConflictingFinalResultReachesDlt() throws Exception {
         var order = order(OrderStatus.WAITING_FOR_PAYMENT);
         var failure = event(order, "PaymentFailed");
         send(failure);
         failure.put("eventId", UUID.randomUUID());
         send(failure);
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(inbox.count()).isEqualTo(2));
-        assertThat(orderStatus(order)).isEqualTo(OrderStatus.WAITING_FOR_PAYMENT);
+        assertThat(orderStatus(order)).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(outbox.findAll()).singleElement()
+                .extracting(eventRow -> eventRow.getEventType()).isEqualTo("OrderCancelledEvent");
         assertThat(results.findAll()).singleElement().satisfies(result -> {
             assertThat(result.getStatus()).isEqualTo(PaymentResultStatus.FAILED);
             assertThat(result.getFailureCode()).isEqualTo("SESSION_EXPIRED");
         });
         assertThat(history.findAll()).singleElement().satisfies(change -> {
             assertThat(change.getOldStatus()).isEqualTo(OrderStatus.WAITING_FOR_PAYMENT);
-            assertThat(change.getNewStatus()).isEqualTo(OrderStatus.WAITING_FOR_PAYMENT);
+            assertThat(change.getNewStatus()).isEqualTo(OrderStatus.CANCELLED);
             assertThat(change.getReason()).isEqualTo(OrderChangeHistoryReason.PAYMENT_FAILED);
         });
 
@@ -172,7 +181,7 @@ class PaymentScenariosIntegrationTest {
                     .isEqualTo(mapper.writeValueAsString(conflict));
         }
         assertThat(inbox.existsById((UUID) conflict.get("eventId"))).isFalse();
-        assertThat(orderStatus(order)).isEqualTo(OrderStatus.WAITING_FOR_PAYMENT);
+        assertThat(orderStatus(order)).isEqualTo(OrderStatus.CANCELLED);
         assertThat(history.count()).isEqualTo(1);
         assertThat(results.count()).isEqualTo(1);
     }
@@ -212,15 +221,16 @@ class PaymentScenariosIntegrationTest {
         var order = order(OrderStatus.WAITING_FOR_PAYMENT);
         var event = event(order, "PaymentSucceeded");
         var record = new ConsumerRecord<>(PAYMENTS, 0, 0, order.getId().toString(), mapper.writeValueAsString(event));
-        doThrow(new IllegalStateException("Simulated database failure")).when(history).save(any());
+        doThrow(new IllegalStateException("Simulated database failure")).when(outbox).save(any());
 
         assertThatThrownBy(() -> listener.consume(record)).hasRootCauseInstanceOf(IllegalStateException.class);
         assertThat(orderStatus(order)).isEqualTo(OrderStatus.WAITING_FOR_PAYMENT);
         assertThat(inbox.count()).isZero();
         assertThat(results.count()).isZero();
         assertThat(history.count()).isZero();
+        assertThat(outbox.count()).isZero();
 
-        reset(history);
+        reset(history, outbox);
         reset(handler);
         doThrow(new DataAccessResourceFailureException("Simulated temporary failure"))
                 .doCallRealMethod().when(handler).handle(any());
@@ -268,12 +278,34 @@ class PaymentScenariosIntegrationTest {
         assertThat(results.findAll()).singleElement()
                 .extracting(result -> result.getStatus()).isEqualTo(PaymentResultStatus.SUCCEEDED);
         assertThat(history.count()).isZero();
+        assertThat(outbox.findAll()).singleElement()
+                .extracting(eventRow -> eventRow.getEventType()).isEqualTo("OrderCancelledEvent");
 
         try (var rejected = consumer("inventory.events.order-service.dlt")) {
             String key = UUID.randomUUID().toString();
             kafka.send("inventory.events", key, "invalid inventory json").get(10, TimeUnit.SECONDS);
             assertThat(receive(rejected, key).value()).isEqualTo("invalid inventory json");
         }
+    }
+
+    @Test
+    void cancellationRollsBackWithoutOutbox_andRepeatedCancellationIgnoresLateInventoryResult() throws Exception {
+        var order = order(OrderStatus.WAITING_FOR_INVENTORY);
+        doThrow(new IllegalStateException("Simulated outbox failure")).when(outbox).save(any());
+        mvc.perform(post("/api/orders/" + order.getId() + "/cancel"))
+                .andExpect(status().isInternalServerError());
+        assertThat(orderStatus(order)).isEqualTo(OrderStatus.WAITING_FOR_INVENTORY);
+        assertThat(history.count()).isZero();
+        assertThat(outbox.count()).isZero();
+
+        reset(outbox);
+        mvc.perform(post("/api/orders/" + order.getId() + "/cancel")).andExpect(status().isNoContent());
+        mvc.perform(post("/api/orders/" + order.getId() + "/cancel")).andExpect(status().isNoContent());
+        commands.reserveInventory(order.getId());
+        assertThat(orderStatus(order)).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(history.count()).isEqualTo(1);
+        assertThat(outbox.findAll()).singleElement()
+                .extracting(eventRow -> eventRow.getEventType()).isEqualTo("OrderCancelledEvent");
     }
 
     private OrderEntity order(OrderStatus status) {

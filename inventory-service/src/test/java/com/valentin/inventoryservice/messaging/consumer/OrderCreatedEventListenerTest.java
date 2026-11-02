@@ -1,7 +1,9 @@
 package com.valentin.inventoryservice.messaging.consumer;
 
 import com.valentin.inventoryservice.logic.OrderCreatedEventHandler;
+import com.valentin.inventoryservice.logic.OrderLifecycleEventHandler;
 import com.valentin.inventoryservice.messaging.event.OrderCreatedEvent;
+import com.valentin.inventoryservice.messaging.event.OrderLifecycleEvent;
 import com.valentin.inventoryservice.messaging.exception.InvalidEventContractException;
 import com.valentin.inventoryservice.messaging.parser.OrderCreatedEventParser;
 import com.valentin.inventoryservice.messaging.validation.OrderCreatedEventValidator;
@@ -9,6 +11,9 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.json.JsonMapper;
+
+import java.time.Instant;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -20,7 +25,8 @@ class OrderCreatedEventListenerTest {
 
     private final OrderCreatedEventHandler handler = mock(OrderCreatedEventHandler.class);
     private final OrderCreatedEventListener listener = new OrderCreatedEventListener(
-            new OrderCreatedEventParser(new JsonMapper()), new OrderCreatedEventValidator(), handler
+            new OrderCreatedEventParser(new JsonMapper()), new OrderCreatedEventValidator(), handler,
+            mock(OrderLifecycleEventHandler.class)
     );
 
     @Test
@@ -67,6 +73,12 @@ class OrderCreatedEventListenerTest {
     @Test
     void consume_whenOrderCreatedContractIsInvalid_shouldStillRejectIt() {
         assertThatThrownBy(() -> listener.consume(record("{\"eventType\":\"OrderCreatedEvent\"}")))
+                .isInstanceOf(InvalidEventContractException.class);
+        var cancelled = new OrderLifecycleEvent(UUID.randomUUID(), OrderLifecycleEvent.CANCELLED, 1,
+                UUID.randomUUID(), Instant.parse("2026-11-01T10:00:00Z"));
+        assertThatThrownBy(() -> listener.consume(record(new JsonMapper().writeValueAsString(cancelled))))
+                .isInstanceOf(InvalidEventContractException.class);
+        assertThatThrownBy(() -> listener.consume(record("{\"eventType\":\"OrderCancelledEvent\"}")))
                 .isInstanceOf(InvalidEventContractException.class);
         verifyNoInteractions(handler);
     }

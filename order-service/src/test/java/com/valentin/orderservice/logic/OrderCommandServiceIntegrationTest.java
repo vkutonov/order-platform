@@ -37,6 +37,7 @@ import static org.mockito.Mockito.when;
 )
 @Import({
         OrderCommandService.class,
+        com.valentin.orderservice.messaging.outbox.OutboxEventService.class,
         TimeConfig.class
 })
 @Testcontainers

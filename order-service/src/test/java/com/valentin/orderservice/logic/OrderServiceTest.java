@@ -112,7 +112,8 @@ public class OrderServiceTest {
                 orderRepository,
                 orderMapper,
                 objectMapper,
-                outboxEventRepository
+                outboxEventRepository,
+                new com.valentin.orderservice.messaging.outbox.OutboxEventService(outboxEventRepository, objectMapper)
         );
 
         orderQueryService = new OrderQueryService(
@@ -571,7 +572,7 @@ public class OrderServiceTest {
     void cancelOrder_shouldChangeStatusAndSaveHistory() {
         OrderEntity order = orderWithStatus(OrderStatus.WAITING_FOR_INVENTORY);
 
-        when(orderRepository.findById(order.getId()))
+        when(orderRepository.findByIdForUpdate(order.getId()))
                 .thenReturn(Optional.of(order));
 
         actualOrderCommandService.cancelOrder(order.getId());
@@ -579,7 +580,7 @@ public class OrderServiceTest {
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
         assertThat(order.getUpdatedAt()).isAfterOrEqualTo(order.getCreatedAt());
 
-        verify(orderRepository).findById(order.getId());
+        verify(orderRepository).findByIdForUpdate(order.getId());
         verify(orderHistoryRepository).save(historyCaptor.capture());
         assertStatusHistory(
                 historyCaptor.getValue(),
@@ -595,12 +596,12 @@ public class OrderServiceTest {
     void reserveInventory_shouldThrowOrderNotFoundException() {
         UUID orderId = UUID.randomUUID();
 
-        when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
+        when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> actualOrderCommandService.reserveInventory(orderId))
                 .isInstanceOf(OrderNotFoundException.class);
 
-        verify(orderRepository).findById(orderId);
+        verify(orderRepository).findByIdForUpdate(orderId);
         verifyNoInteractions(orderHistoryRepository);
     }
 

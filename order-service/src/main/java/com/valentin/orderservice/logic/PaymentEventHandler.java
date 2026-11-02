@@ -12,6 +12,8 @@ import com.valentin.orderservice.domain.dictionary.PaymentResultStatus;
 import com.valentin.orderservice.messaging.event.PaymentEvent;
 import com.valentin.orderservice.messaging.event.PaymentFailed;
 import com.valentin.orderservice.messaging.event.PaymentSucceeded;
+import com.valentin.orderservice.messaging.event.OrderLifecycleEvent;
+import com.valentin.orderservice.messaging.outbox.OutboxEventService;
 import com.valentin.orderservice.messaging.exception.InvalidEventContractException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,7 @@ public class PaymentEventHandler {
     private final PaymentResultRepository results;
     private final OrderHistoryRepository history;
     private final Clock clock;
+    private final OutboxEventService outbox;
 
     @Transactional
     public void handle(PaymentEvent event) {
@@ -79,6 +82,9 @@ public class PaymentEventHandler {
         OrderStatus oldStatus = order.getStatus();
 
         if (oldStatus != OrderStatus.WAITING_FOR_PAYMENT) {
+            if (oldStatus == OrderStatus.CANCELLED && resultStatus == PaymentResultStatus.SUCCEEDED) {
+                outbox.enqueue(OrderLifecycleEvent.of(OrderLifecycleEvent.CANCELLED, order.getId(), now));
+            }
             afterCommit(() -> log.warn(
                     "Payment result saved without changing order status: eventId={}, paymentId={}, orderId={}, result={}, orderStatus={}",
                     event.eventId(), event.paymentId(), event.orderId(), resultStatus, oldStatus));
@@ -87,6 +93,10 @@ public class PaymentEventHandler {
 
         if (resultStatus == PaymentResultStatus.SUCCEEDED) {
             order.markPaymentSucceeded(now);
+            outbox.enqueue(OrderLifecycleEvent.of(OrderLifecycleEvent.PAID, order.getId(), now));
+        } else {
+            order.cancel(now);
+            outbox.enqueue(OrderLifecycleEvent.of(OrderLifecycleEvent.CANCELLED, order.getId(), now));
         }
 
         OrderChangeHistoryReason reason = resultStatus == PaymentResultStatus.SUCCEEDED

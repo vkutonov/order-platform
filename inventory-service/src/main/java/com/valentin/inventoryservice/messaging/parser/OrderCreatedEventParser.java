@@ -1,6 +1,7 @@
 package com.valentin.inventoryservice.messaging.parser;
 
 import com.valentin.inventoryservice.messaging.event.OrderCreatedEvent;
+import com.valentin.inventoryservice.messaging.event.OrderLifecycleEvent;
 import com.valentin.inventoryservice.messaging.exception.InvalidEventContractException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -23,8 +24,9 @@ public class OrderCreatedEventParser {
                 throw new InvalidEventContractException("Event must be a JSON object");
             }
 
-            // This order event is consumed by payment-service, not inventory-service.
-            if ("OrderReadyForPaymentEvent".equals(event.path("eventType").asString())) {
+            if ("OrderReadyForPaymentEvent".equals(event.path("eventType").asString())
+                    || OrderLifecycleEvent.PAID.equals(event.path("eventType").asString())
+                    || OrderLifecycleEvent.CANCELLED.equals(event.path("eventType").asString())) {
                 return Optional.empty();
             }
 
@@ -34,6 +36,20 @@ public class OrderCreatedEventParser {
                     "Cannot parse OrderCreatedEvent",
                     exception
             );
+        }
+    }
+
+    public Optional<OrderLifecycleEvent> parseLifecycle(String payload) {
+        try {
+            var event = objectMapper.readTree(payload);
+            if (event != null && event.isObject()
+                    && (OrderLifecycleEvent.PAID.equals(event.path("eventType").asString())
+                    || OrderLifecycleEvent.CANCELLED.equals(event.path("eventType").asString()))) {
+                return Optional.of(objectMapper.treeToValue(event, OrderLifecycleEvent.class));
+            }
+            return Optional.empty();
+        } catch (JacksonException exception) {
+            throw new InvalidEventContractException("Cannot parse order lifecycle event", exception);
         }
     }
 }

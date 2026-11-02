@@ -2,9 +2,11 @@ package com.valentin.orderservice.messaging.outbox;
 
 import com.valentin.orderservice.db.OutboxEventRepository;
 import com.valentin.orderservice.domain.OutboxEventEntity;
+import com.valentin.orderservice.messaging.event.OrderLifecycleEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.List;
@@ -15,6 +17,13 @@ import java.util.UUID;
 public class OutboxEventService {
 
     private final OutboxEventRepository outboxEventRepository;
+    private final ObjectMapper objectMapper;
+
+    @Transactional
+    public void enqueue(OrderLifecycleEvent event) {
+        outboxEventRepository.save(OutboxEventEntity.create(event.eventId(), "Order", event.orderId(),
+                event.eventType(), objectMapper.writeValueAsString(event), event.occurredAt()));
+    }
 
     @Transactional
     public List<OutboxEventEntity> claimNewEvents(int limit) {

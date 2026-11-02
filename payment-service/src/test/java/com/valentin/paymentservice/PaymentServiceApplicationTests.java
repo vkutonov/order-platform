@@ -21,7 +21,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties = {"app.outbox.polling.enabled=false", "spring.kafka.listener.auto-startup=false"})
+@SpringBootTest(properties = {"app.outbox.polling.enabled=false", "spring.kafka.listener.auto-startup=false",
+        "app.payment.expiration.enabled=false"})
 @AutoConfigureMockMvc
 @Testcontainers
 class PaymentServiceApplicationTests {
@@ -56,7 +57,7 @@ class PaymentServiceApplicationTests {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT to_regclass('public.flyway_schema_history')::text", String.class
         )).isEqualTo("flyway_schema_history");
-        assertThat(flyway.info().applied()).hasSize(3);
+        assertThat(flyway.info().applied()).hasSize(4);
         assertThat(jdbcTemplate.queryForList(
                 "SELECT column_name FROM information_schema.columns WHERE table_name = 'payments'", String.class
         )).doesNotContain("checkout_url", "provider_payment_id");

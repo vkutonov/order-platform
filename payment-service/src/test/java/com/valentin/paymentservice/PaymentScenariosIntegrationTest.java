@@ -8,6 +8,12 @@ import com.valentin.paymentservice.logic.OrderReadyForPaymentEventHandler;
 import com.valentin.paymentservice.messaging.event.OrderReadyForPaymentEvent;
 import com.valentin.paymentservice.messaging.event.PaymentFailed;
 import com.valentin.paymentservice.messaging.event.PaymentSucceeded;
+import com.valentin.paymentservice.messaging.event.PaymentRefunded;
+import com.valentin.paymentservice.messaging.event.OrderLifecycleEvent;
+import com.valentin.paymentservice.db.RefundRepository;
+import com.valentin.paymentservice.db.ProcessedEventRepository;
+import com.valentin.paymentservice.logic.PaymentService;
+import com.valentin.paymentservice.logic.PaymentExpirationScheduler;
 import com.valentin.paymentservice.messaging.parser.PaymentMessageParser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,7 +47,8 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = {"app.outbox.polling.enabled=false", "spring.kafka.listener.auto-startup=false"})
+@SpringBootTest(properties = {"app.outbox.polling.enabled=false", "spring.kafka.listener.auto-startup=false",
+        "app.payment.expiration.enabled=false"})
 @AutoConfigureMockMvc
 @Testcontainers
 class PaymentScenariosIntegrationTest {
@@ -63,6 +70,9 @@ class PaymentScenariosIntegrationTest {
     @Autowired private PaymentMessageParser parser;
     @Autowired private PaymentRepository payments;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private PaymentService service;
+    @Autowired private RefundRepository refunds;
+    @Autowired private ProcessedEventRepository inbox;
     @MockitoSpyBean private OutboxEventRepository outbox;
     @MockitoBean private Clock clock;
 
@@ -71,6 +81,52 @@ class PaymentScenariosIntegrationTest {
         reset(outbox);
         when(clock.instant()).thenReturn(NOW);
         jdbc.execute("TRUNCATE refunds, payments, processed_events, outbox_events");
+    }
+
+    @Test
+    void cancellationAfterChargeRefundsOnce_andOutboxFailureRollsBackRefundAndInbox() throws Exception {
+        var id = createPayment();
+        var orderId = payments.findById(id).orElseThrow().getOrderId();
+        service.confirm(orderId);
+        var cancelled = new OrderLifecycleEvent(UUID.randomUUID(), OrderLifecycleEvent.CANCELLED, 1, orderId, NOW);
+        doThrow(new IllegalStateException("Simulated outbox failure")).when(outbox).save(any());
+        assertThatThrownBy(() -> orders.handleCancellation(cancelled)).hasRootCauseInstanceOf(IllegalStateException.class);
+        assertThat(refunds.count()).isZero();
+        assertThat(inbox.existsById(cancelled.eventId())).isFalse();
+        assertThat(payments.findById(id).orElseThrow().getStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
+
+        reset(outbox);
+        orders.handleCancellation(cancelled);
+        orders.handleCancellation(cancelled);
+        orders.handleCancellation(new OrderLifecycleEvent(UUID.randomUUID(), OrderLifecycleEvent.CANCELLED, 1, orderId, NOW));
+        assertThat(refunds.findAll()).singleElement().satisfies(refund -> {
+            assertThat(refund.getStatus().name()).isEqualTo("SUCCEEDED");
+            assertThat(refund.getPaymentId()).isEqualTo(id);
+        });
+        assertThat(outbox.findAll()).hasSize(2);
+        assertThat(outbox.findAll().stream().filter(event -> event.getEventType().equals(PaymentRefunded.TYPE)))
+                .singleElement().satisfies(event -> {
+                    var refunded = (PaymentRefunded) parser.parse(event.getPayload());
+                    assertThat(refunded.paymentId()).isEqualTo(id);
+                    assertThat(refunded.orderId()).isEqualTo(orderId);
+                    assertThat(refunded.totalPrice()).isEqualByComparingTo("150.00");
+                });
+    }
+
+    @Test
+    void expirationWithoutUserRequestsPublishesOneFailure_andSkipsCompletedPayments() {
+        var id = createPayment();
+        var paid = createPayment();
+        service.confirm(payments.findById(paid).orElseThrow().getOrderId());
+        var scheduler = new PaymentExpirationScheduler(payments, service, clock);
+        scheduler.expirePending();
+        assertThat(payments.findById(id).orElseThrow().getStatus()).isEqualTo(PaymentStatus.PENDING);
+        when(clock.instant()).thenReturn(NOW.plusSeconds(901));
+        scheduler.expirePending();
+        scheduler.expirePending();
+        assertThat(payments.findById(id).orElseThrow().getFailureCode()).isEqualTo("SESSION_EXPIRED");
+        assertThat(payments.findById(paid).orElseThrow().getStatus()).isEqualTo(PaymentStatus.SUCCEEDED);
+        assertThat(outbox.findAll()).hasSize(2);
     }
 
     @Test

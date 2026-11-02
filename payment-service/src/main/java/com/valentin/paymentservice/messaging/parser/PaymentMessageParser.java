@@ -2,6 +2,7 @@ package com.valentin.paymentservice.messaging.parser;
 
 import com.valentin.paymentservice.messaging.event.PaymentMessage;
 import com.valentin.paymentservice.messaging.event.OrderReadyForPaymentEvent;
+import com.valentin.paymentservice.messaging.event.OrderLifecycleEvent;
 import com.valentin.paymentservice.messaging.exception.InvalidEventContractException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -15,6 +16,22 @@ import java.util.Optional;
 public class PaymentMessageParser {
 
     private final ObjectMapper objectMapper;
+
+    public Optional<OrderLifecycleEvent> parseCancellation(String payload) {
+        if (payload == null || payload.isBlank()) {
+            throw new InvalidEventContractException("Order event must not be empty");
+        }
+        try {
+            var event = objectMapper.readTree(payload);
+            if (event != null && event.isObject()
+                    && OrderLifecycleEvent.CANCELLED.equals(event.path("eventType").asString())) {
+                return Optional.of(objectMapper.treeToValue(event, OrderLifecycleEvent.class));
+            }
+            return Optional.empty();
+        } catch (JacksonException exception) {
+            throw new InvalidEventContractException("Cannot parse order cancellation", exception);
+        }
+    }
 
     public Optional<OrderReadyForPaymentEvent> parseOrderEvent(String payload) {
         if (payload == null || payload.isBlank()) {

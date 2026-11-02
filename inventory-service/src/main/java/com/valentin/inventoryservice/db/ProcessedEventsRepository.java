@@ -13,6 +13,12 @@ import java.util.UUID;
 @Repository
 public interface ProcessedEventsRepository extends JpaRepository<ProcessedEventEntity, UUID> {
 
+    boolean existsByAggregateIdAndEventType(UUID aggregateId, String eventType);
+
+    // Блокировка действует до конца транзакции, в том числе до создания платежа или резерва.
+    @Query(value = "select true from pg_advisory_xact_lock(hashtextextended(cast(:orderId as text), 0))", nativeQuery = true)
+    boolean lockOrder(@Param("orderId") UUID orderId);
+
     @Modifying
     @Query(value = """
            INSERT INTO ProcessedEventEntity (

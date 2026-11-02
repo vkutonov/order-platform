@@ -8,6 +8,7 @@ import com.valentin.inventoryservice.mapper.OrderCreatedEventMapper;
 import com.valentin.inventoryservice.messaging.event.InventoryReservationFailedEvent;
 import com.valentin.inventoryservice.messaging.event.InventoryReservedEvent;
 import com.valentin.inventoryservice.messaging.event.OrderCreatedEvent;
+import com.valentin.inventoryservice.messaging.event.OrderLifecycleEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,7 @@ public class OrderCreatedEventHandler {
     @Transactional
     public void handle(OrderCreatedEvent event) {
         Instant now = clock.instant();
+        processedEventsRepository.lockOrder(event.orderId());
 
         int insert = processedEventsRepository.tryInsert(
                 event.eventId(),
@@ -44,6 +46,12 @@ public class OrderCreatedEventHandler {
         );
 
         if (insert == 0) {
+            return;
+        }
+
+        if (processedEventsRepository.existsByAggregateIdAndEventType(event.orderId(), OrderLifecycleEvent.CANCELLED)
+                || processedEventsRepository.existsByAggregateIdAndEventType(event.orderId(), OrderLifecycleEvent.PAID)) {
+            log.debug("Reservation creation skipped for completed order: orderId={}, eventId={}", event.orderId(), event.eventId());
             return;
         }
 

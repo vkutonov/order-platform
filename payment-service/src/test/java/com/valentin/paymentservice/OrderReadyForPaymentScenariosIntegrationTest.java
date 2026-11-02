@@ -9,6 +9,7 @@ import com.valentin.paymentservice.messaging.consumer.OrderReadyForPaymentEventL
 import com.valentin.paymentservice.messaging.event.OrderReadyForPaymentEvent;
 import com.valentin.paymentservice.messaging.event.PaymentFailed;
 import com.valentin.paymentservice.messaging.event.PaymentSucceeded;
+import com.valentin.paymentservice.messaging.event.OrderLifecycleEvent;
 import com.valentin.paymentservice.messaging.outbox.OutboxEventPoller;
 import com.valentin.paymentservice.messaging.parser.PaymentMessageParser;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -16,6 +17,8 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -54,7 +57,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties = "app.outbox.polling.enabled=false")
+@SpringBootTest(properties = {"app.outbox.polling.enabled=false", "app.payment.expiration.enabled=false"})
 @AutoConfigureMockMvc
 @EmbeddedKafka(partitions = 1, topics = {"order.events", "payment.events", "order.events.payment-service.dlt"},
         bootstrapServersProperty = "spring.kafka.bootstrap-servers")
@@ -97,6 +100,37 @@ class OrderReadyForPaymentScenariosIntegrationTest {
         when(clock.instant()).thenReturn(NOW);
         ContainerTestUtils.waitForAssignment(listeners.getListenerContainer("orderReadyForPayment"), 1);
         jdbc.execute("TRUNCATE refunds, payments, processed_events, outbox_events");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void cancellationBeforeOrAfterReadinessPreventsConfirmation_andPublishesOneFailure(boolean readyFirst) throws Exception {
+        var ready = new OrderReadyForPaymentEvent(UUID.randomUUID(), OrderReadyForPaymentEvent.TYPE, 1,
+                UUID.randomUUID(), UUID.randomUUID(), new BigDecimal("150.00"), "RUB", Map.of(), NOW);
+        var cancelled = new OrderLifecycleEvent(UUID.randomUUID(), OrderLifecycleEvent.CANCELLED, 1, ready.orderId(), NOW);
+        if (readyFirst) {
+            kafka.send(ORDERS, ready.orderId().toString(), mapper.writeValueAsString(ready)).get(10, TimeUnit.SECONDS);
+            await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(payments.count()).isEqualTo(1));
+        }
+        kafka.send(ORDERS, ready.orderId().toString(), mapper.writeValueAsString(cancelled)).get(10, TimeUnit.SECONDS);
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(inbox.existsById(cancelled.eventId())).isTrue());
+        if (!readyFirst) {
+            kafka.send(ORDERS, ready.orderId().toString(), mapper.writeValueAsString(ready)).get(10, TimeUnit.SECONDS);
+        }
+        kafka.send(ORDERS, ready.orderId().toString(), mapper.writeValueAsString(cancelled)).get(10, TimeUnit.SECONDS);
+        var duplicate = new OrderLifecycleEvent(UUID.randomUUID(), OrderLifecycleEvent.CANCELLED, 1, ready.orderId(), NOW);
+        kafka.send(ORDERS, ready.orderId().toString(), mapper.writeValueAsString(duplicate)).get(10, TimeUnit.SECONDS);
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
+            assertThat(inbox.count()).isEqualTo(3);
+            assertThat(payments.findByOrderIdAndAttemptNumber(ready.orderId(), 1).orElseThrow().getFailureCode())
+                    .isEqualTo("ORDER_CANCELLED");
+        });
+        mvc.perform(post("/api/payments/by-order/" + ready.orderId() + "/confirm"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.failureCode").value("ORDER_CANCELLED"));
+        assertThat(outbox.findAll()).singleElement()
+                .satisfies(event -> assertThat(parser.parse(event.getPayload())).isInstanceOf(PaymentFailed.class));
     }
 
     @Test

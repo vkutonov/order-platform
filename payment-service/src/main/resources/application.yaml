@@ -54,6 +54,9 @@ spring:
 app:
   payment:
     expiration-minutes: 15
+    expiration:
+      enabled: true
+      check-delay-ms: 10000
   kafka:
     topics:
       order-events: order.events
