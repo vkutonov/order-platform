@@ -1,339 +1,195 @@
 # Order Platform
 
-<div align="center">
-
 [![Order Platform CI](https://github.com/vkutonov/order-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/vkutonov/order-platform/actions/workflows/ci.yml)
 
-**Event-driven backend-платформа для надёжной обработки заказов и управления товарными остатками.**
+Event-driven платформа управления заказами
 
-Java 21 · Spring Boot · PostgreSQL · Apache Kafka · Transactional Outbox · Inbox Pattern
+Java 21 · Spring Boot 4.1 · PostgreSQL · Apache Kafka · Docker Compose
 
-</div>
+Три микросервиса — заказы, склад и платежи — взаимодействуют через события Apache Kafka. 
+Платформа обрабатывает полный цикл заказа: создание, резервирование товаров, оплату и списание резерва. 
+При отказе оплаты, отмене или истечении срока ожидания выполняются компенсации с освобождением товаров.
 
----
+[Архитектура и события](docs/architecture.md) · [Запуск, API и эксплуатация](docs/operations.md) · [Сценарии заказа](docs/demo.md)
 
-## О проекте
+## Что реализовано
 
-`Order Platform` сочетает синхронное взаимодействие сервисов для получения актуальных данных о товарах и асинхронную обработку резервирования через Apache Kafka.
-
-Каждый сервис владеет собственной базой данных и выполняет только локальные транзакции.
-
-<table>
-  <thead>
-    <tr>
-      <th align="left">Сервис</th>
-      <th align="left">Зона ответственности</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code>order-service</code></td>
-      <td>Заказы, позиции заказа, жизненный цикл и история статусов</td>
-    </tr>
-    <tr>
-      <td><code>inventory-service</code></td>
-      <td>Товары, складские остатки и резервации</td>
-    </tr>
-    <tr>
-      <td><code>payment-service</code></td>
-      <td>Модель платежей, Kafka-контракты, outbox и локальная имитация оплаты</td>
-    </tr>
-  </tbody>
-</table>
+- Создание заказа со снимком названия, цены и валюты товара на момент покупки.
+- Асинхронное резервирование: недостаток товара завершает заказ бизнес-отказом.
+- Автоматическое создание платежа; подтверждение и отказ доступны через REST API.
+- Списание резерва после оплаты; освобождение товара при отказе, отмене и истечении срока.
+- Mock-возврат, если оплата успела подтвердиться одновременно с отменой заказа.
+- Каталог с остатками и мягким удалением товаров; история статусов заказа.
 
 ## Архитектура
 
-<p align="center">
-  <img src="docs/architecture.svg" alt="Order Platform architecture" width="100%">
-</p>
+![Три сервиса, отдельные PostgreSQL и обмен событиями через Kafka](docs/order-platform-architecture.svg)
 
-- Клиент обращается к публичному REST API сервисов.
-- `order-service` запрашивает у `inventory-service` product snapshots по HTTP.
-- Сервисы обмениваются доменными событиями через Kafka и не используют общую базу данных.
+При создании заказа `order-service` получает снимки товаров из `inventory-service`
+по HTTP. Резервирование, обработка оплаты и компенсации затем выполняются через Kafka.
+`PAID` означает получение оплаты; списание резерва применяется асинхронно.
 
-После успешного резервирования `order-service` переводит заказ в `WAITING_FOR_PAYMENT`
-и в той же транзакции сохраняет `OrderReadyForPaymentEvent` в существующий outbox.
-Текущий publisher отправляет его в `order.events` с ключом `orderId`; повторы доставки
-используют тот же `eventId`. Контракт версии 1 содержит `eventId`, `eventType`,
-`eventVersion`, `orderId`, `userId`, `totalPrice`, `currency`, `context` и `occurredAt`.
-`totalPrice` и `currency` берутся из сохранённого заказа. `inventory-service`
-пропускает это событие. `payment-service` потребляет `OrderReadyForPaymentEvent`
-из `order.events` и автоматически создаёт платёж в статусе `PENDING`.
-Обработку результата оплаты в `order-service` ещё предстоит реализовать.
+| Сервис | Ответственность | Swagger |
+|---|---|---|
+| `order-service` | Заказы, переходы статусов и история | [localhost:8081](http://localhost:8081/swagger-ui/index.html) |
+| `inventory-service` | Товары, остатки и резервы | [localhost:8082](http://localhost:8082/swagger-ui/index.html) |
+| `payment-service` | Платежи, срок оплаты и mock-возвраты | [localhost:8083](http://localhost:8083/swagger-ui/index.html) |
 
-Для локальной проверки payment-service позволяет просмотреть платежи и вручную
-подтвердить оплату по `paymentId`. Результат отправляется через существующий outbox.
-Отдельный провайдер не нужен. Инструкция: [payment-service](payment-service/README.md).
+[Kafka UI](http://localhost:8085) позволяет просматривать события и consumer groups.
+Адреса указаны для портов из `.env.example`.
 
-Во всех трёх сервисах отправка outbox выполняется асинхронно внутри пакета.
-Обновление статусов после ответа Kafka вынесено в отдельный executor: 2 потока
-и очередь размером с пакет. Таймаут доставки Kafka — 30 секунд, запроса — 10 секунд,
-ожидания метаданных и буфера — 5 секунд на вызов. `PROCESSING` возвращается на повтор
-через 60 секунд; этот срок относится ко всей обработке записи, включая ожидание БД.
+## Быстрый запуск
 
-## Сильные стороны
+Нужен запущенный Docker Engine или Docker Desktop с Docker Compose v2.
+Команды выполняются из корня проекта. Если `.env` уже существует, пропустите копирование.
 
-- **Event-driven processing** — резервирование выполняется асинхронно через Kafka.
-- **Transactional Outbox** — бизнес-данные и integration event сохраняются атомарно.
-- **Inbox Pattern** — повторная доставка сообщения не создаёт повторный бизнес-эффект.
-- **Retry и DLT** — временные ошибки повторяются, невалидные события отправляются в Dead Letter Topic.
-- **Optimistic locking** — защищает складские остатки от конкурентных изменений.
-- **Database per service** — каждый сервис владеет своей PostgreSQL database и Flyway migrations.
+**Windows / PowerShell**
 
-> Kafka обеспечивает `at-least-once delivery`, а Inbox Pattern даёт `effectively-once business effect`: сообщение может прийти повторно, но резервирование не выполнится второй раз.
+```powershell
+Copy-Item .env.example .env
+docker compose up -d --build --wait
+```
 
-## Гарантии надёжности
+<details>
+<summary>Linux / macOS</summary>
 
-<table>
-  <thead>
-    <tr>
-      <th align="left">Сценарий</th>
-      <th align="left">Гарантия</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Заказ сохранён, но приложение упало до публикации</td>
-      <td><code>OrderCreatedEvent</code> остаётся в Transactional Outbox и будет опубликован повторно</td>
-    </tr>
-    <tr>
-      <td>Kafka повторно доставила событие</td>
-      <td><code>processed_events</code> блокирует повторную обработку по <code>eventId</code></td>
-    </tr>
-    <tr>
-      <td>Consumer упал после DB commit, но до offset commit</td>
-      <td>Повторная доставка распознаётся как duplicate</td>
-    </tr>
-    <tr>
-      <td>PostgreSQL временно недоступен или возник concurrency conflict</td>
-      <td>Локальная транзакция откатывается, после чего выполняется retry</td>
-    </tr>
-    <tr>
-      <td>Event contract нарушен или версия события не поддерживается</td>
-      <td>Сообщение классифицируется как non-retryable и отправляется в DLT</td>
-    </tr>
-    <tr>
-      <td>Резервирование завершено, но Kafka временно недоступна</td>
-      <td>Результат и result event уже сохранены атомарно в inventory outbox</td>
-    </tr>
-  </tbody>
-</table>
+```bash
+cp .env.example .env
+docker compose up -d --build --wait
+```
 
-Ожидаемый бизнес-отказ, например недостаток товара, сохраняется как failed reservation и не запускает Kafka retry. Техническая ошибка приводит к rollback всей локальной транзакции.
+</details>
 
-## Основные API
+Первый запуск включает сборку образов и загрузку зависимостей.
+PostgreSQL и Kafka поднимаются вместе с приложениями; Flyway применяет миграции автоматически.
 
-### Order Service
+Проверить состояние:
 
-Базовый адрес: `http://localhost:8081`
+```powershell
+docker compose ps
+```
 
-<table>
-  <thead>
-    <tr>
-      <th>Метод</th>
-      <th align="left">Endpoint</th>
-      <th align="left">Назначение</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code>POST</code></td>
-      <td><code>/api/orders</code></td>
-      <td>Создать заказ</td>
-    </tr>
-    <tr>
-      <td><code>GET</code></td>
-      <td><code>/api/orders/{id}</code></td>
-      <td>Получить заказ по ID</td>
-    </tr>
-    <tr>
-      <td><code>GET</code></td>
-      <td><code>/api/orders/user/{userId}</code></td>
-      <td>Получить заказы пользователя</td>
-    </tr>
-    <tr>
-      <td><code>GET</code></td>
-      <td><code>/api/orders/{id}/history</code></td>
-      <td>Получить историю статусов заказа</td>
-    </tr>
-  </tbody>
-</table>
+[Запуск из IDE, переменные окружения и пересборка контейнеров](docs/operations.md).
 
-Пример запроса:
+## Попробовать флоу заказа
+
+Все шаги доступны через Swagger. Создавать платёж или публиковать Kafka-события вручную не требуется.
+
+**1. Создайте товар** через `POST /api/products` на `8082`:
 
 ```json
 {
-  "userId": "8d2c8c3d-fc8f-4f7a-9a9b-9a1e0a0a0001",
+  "name": "Клавиатура",
+  "description": "Описание",
+  "unitPrice": 2890.00,
+  "currency": "RUB",
+  "quantityOnHand": 10
+}
+```
+
+**2. Скопируйте `id` товара из ответа и создайте заказ** через `POST /api/orders` на `8081`.
+Замените `<productId>` реальным UUID:
+
+```json
+{
+  "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "items": [
     {
-      "productId": "2c6ad9f2-3d7b-4b3a-a93b-6e98c6a00001",
+      "productId": "<productId>",
       "quantity": 2
     }
   ]
 }
 ```
 
-Клиент не передаёт название, цену и валюту. `order-service` получает эти данные из `inventory-service` и сохраняет snapshot позиции заказа на момент создания.
+**3. Дождитесь готовности к оплате.** В `GET /api/orders/{id}` появится
+`WAITING_FOR_PAYMENT`. Затем найдите платёж с этим `orderId` в `GET /api/payments` на `8083`.
 
-### Inventory Service
+**4. Подтвердите оплату** через `POST /api/payments/by-order/{orderId}/confirm` на `8083`.
+Тело запроса не нужно.
 
-Базовый адрес: `http://localhost:8082`
+**5. Проверьте итог.** Обновите `GET /api/orders/{id}`, историю заказа
+`GET /api/orders/{id}/history` и остаток `GET /api/products/{id}/stock`:
 
-<table>
-  <thead>
-    <tr>
-      <th>Метод</th>
-      <th align="left">Endpoint</th>
-      <th align="left">Назначение</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code>POST</code></td>
-      <td><code>/api/products</code></td>
-      <td>Создать товар</td>
-    </tr>
-    <tr>
-      <td><code>POST</code></td>
-      <td><code>/api/products/{id}/stock</code></td>
-      <td>Пополнить складской остаток</td>
-    </tr>
-    <tr>
-      <td><code>GET</code></td>
-      <td><code>/api/products/{id}/stock</code></td>
-      <td>Получить состояние остатка</td>
-    </tr>
-    <tr>
-      <td><code>POST</code></td>
-      <td><code>/internal/products/batch</code></td>
-      <td>Получить product snapshots для внутренних сервисов</td>
-    </tr>
-  </tbody>
-</table>
+| Объект | Ожидаемый результат |
+|---|---|
+| Заказ | `PAID`, в истории — `PAYMENT_SUCCEEDED` |
+| Платёж | `SUCCEEDED`, сумма `5780.00 RUB` |
+| Товар | `quantityOnHand = 8`, `reservedQuantity = 0`, `availableQuantity = 8` |
 
-`/internal/**` предназначен для межсервисного взаимодействия и не является пользовательским API.
+События доставляются асинхронно: итог может появиться после нескольких обновлений ответа.
 
-## Валидация и обработка ошибок
+Для проверки компенсации создайте **ещё один заказ** на две единицы того же товара
+и вызовите `/reject` вместо `/confirm`. Дождитесь `CANCELLED`: после освобождения
+второго резерва остаток снова будет `8 / 0 / 8`.
 
-Валидация выполняется на нескольких уровнях:
+[Сценарии оплаты, отказа, ручной отмены и истечения срока](docs/demo.md).
 
-- Jakarta Validation проверяет обязательные поля, вложенные items и положительное quantity;
-- application validation проверяет наличие товаров, статус `ACTIVE` и единую валюту заказа;
-- domain rules защищают lifecycle transitions и операции с остатками;
-- Kafka consumer проверяет event contract и поддерживаемую `eventVersion`;
-- database constraints остаются последней границей консистентности.
+<details>
+<summary>Демонстрация в Swagger и Kafka UI</summary>
 
-REST API возвращает единый error response со стабильным `ApiErrorCode`, HTTP status и `fieldErrors`. Ошибки Kafka-контракта обрабатываются отдельно через Kafka Error Handler и DLT.
+**1. Успешный заказ.** История заказа с `PAID` и причиной `PAYMENT_SUCCEEDED`.
 
-## Technology Stack
+Заказ A: `2ad738b9-6ef5-4f71-b89a-c1f94f35d2de`.
 
-`Java 21` · `Spring Boot 4.1` · `Spring Web MVC` · `Spring Data JPA` · `Apache Kafka` · `PostgreSQL` · `Flyway` · `Docker Compose` · `Docker` · `Spring Boot Actuator` · `MapStruct` · `OpenAPI` · `JUnit 5` · `Mockito` · `Testcontainers` · `Gradle` · `GitHub Actions`
+![История оплаченного заказа в Swagger](docs/screenshots/01-order-paid.png)
 
-## Локальный запуск
+**2. Событие оплаты.** `PaymentSucceeded` в Kafka UI: тот же `orderId A`,
+сумма `5780.00 RUB` и собственный `paymentId`.
 
-Для запуска всей платформы в контейнерах нужен Docker Engine / Docker Desktop с Docker Compose v2.
+![Событие PaymentSucceeded для оплаченного заказа в Kafka UI](docs/screenshots/02-payment-event.png)
 
-### Linux
+**3. Компенсация.** Второй заказ `CANCELLED` и товар с освобождённым резервом:
+`quantityOnHand = 8`, `reservedQuantity = 0`, `availableQuantity = 8`.
 
-```bash
-cp .env.example .env
-make up-build
-```
+Заказ B: `bb82be87-00cf-477a-ae83-3a449ba2cd9b`. Две единицы, купленные в заказе A,
+уже списаны; после отказа заказа B его резерв освобождён.
 
-Если `make` не установлен:
+![Отменённый заказ и освобождённый резерв в Swagger](docs/screenshots/03-order-cancelled-stock.png)
 
-```bash
-docker compose up -d --build
-```
+</details>
 
-### Windows (PowerShell)
+## Надёжность и обработка сбоев
+
+| Ситуация | Поведение системы |
+|---|---|
+| Процесс упал после сохранения бизнес-данных, до отправки в Kafka | Событие остаётся в outbox и будет отправлено после восстановления |
+| Kafka повторно доставила сообщение | Inbox проверяет `eventId`; обработчики также учитывают уже сохранённые бизнес-результаты |
+| Отмена доставлена раньше создания резерва или платежа | Сохранённая отмена предотвращает позднее открытие операции |
+| Оплата и отмена произошли одновременно | Заказ сохраняет выбранный итог; успешная оплата отменённого заказа компенсируется mock-возвратом |
+| Техническая ошибка при обработке | Локальная транзакция откатывается, выполняются retry; после их исчерпания сообщение попадает в DLT |
+
+Доставка — `at-least-once`. Outbox, inbox и проверки переходов состояний защищают
+бизнес-операции от повторного применения. Строгий порядок публикации из outbox не гарантируется.
+
+[Границы транзакций, блокировки и контракт событий](docs/architecture.md).
+
+## Тесты и CI
+
+Для локальных тестов нужны JDK 21 и запущенный Docker: интеграционные сценарии
+используют настоящие PostgreSQL через Testcontainers и встроенный Kafka broker.
 
 ```powershell
-Copy-Item .env.example .env
-docker compose up -d --build
+.\gradlew.bat build
 ```
 
-Docker Compose собирает оба сервиса, поднимает PostgreSQL, Kafka и Kafka UI. Сервисы стартуют после готовности БД и Kafka; их health checks используют Actuator: `/actuator/health`.
+Для Linux/macOS: `./gradlew build`.
 
-Порты по умолчанию:
+Тесты проверяют переходы статусов, REST API, миграции, повторную доставку,
+конкурентную обработку, компенсации и откат транзакций.
 
-- `order-service` — `8081`;
-- `inventory-service` — `8082`;
-- Kafka UI — `8085`.
+GitHub Actions запускает сборку и тесты каждого из трёх сервисов.
+Отдельный Docker job проверяет Compose, собирает образы и ожидает готовности приложений.
+Он проверяет запуск; сквозной бизнес-сценарий пока не автоматизирован в этом job.
 
-Полезные команды:
+## Границы текущей версии
 
-```bash
-docker compose ps
-docker compose logs -f order-service
-docker compose down
-```
+- Платежи и возвраты имитируются локально; реальных списаний нет.
+- Авторизация не подключена, включая административные операции подтверждения и отказа.
+- На заказ создаётся одна попытка оплаты; отказ или истечение срока отменяет заказ.
+- Повторный `POST /api/orders` может создать новый заказ: идемпотентность HTTP-создания пока не реализована.
+- В списках товаров и платежей нет пагинации.
+- Разбор сообщений из DLT выполняется вручную; очистка outbox/inbox пока не автоматизирована.
 
-`docker compose down -v` также удалит локальные PostgreSQL-тома.
-
-### Запуск сервисов из IDE
-
-Создать `.env` из шаблона и запустить инфраструктуру:
-
-```bash
-cp .env.example .env
-docker compose up -d order-postgres inventory-postgres kafka kafka-ui kafka-init
-```
-
-Запустить сервисы в отдельных терминалах:
-
-```bash
-cd inventory-service
-./gradlew bootRun
-```
-
-```bash
-cd order-service
-./gradlew bootRun
-```
-
-В Windows PowerShell используйте `Copy-Item` вместо `cp`, а `./gradlew.bat` вместо `./gradlew`.
-
-## Testing и GitHub Actions CI
-
-Проект содержит:
-
-- unit tests для domain rules и service logic;
-- Mockito tests для взаимодействия компонентов;
-- MockMvc tests для REST API, валидации и error handling;
-- integration tests для JPA, PostgreSQL и Flyway migrations;
-- tests для Outbox Publisher и Kafka consumer behavior.
-
-Локальный build:
-
-```bash
-./gradlew build
-```
-
-GitHub Actions запускает отдельный matrix job для `order-service` и `inventory-service` при Pull Request и push в `master`. При failure test reports сохраняются как workflow artifacts. Отдельный Docker job валидирует Compose-конфигурацию, собирает образы и ожидает готовности сервисов по health checks.
-
-## Текущий статус
-
-### Реализовано
-
-- `order-service` и `inventory-service` с отдельными PostgreSQL databases;
-- создание заказов, order lifecycle и история статусов;
-- товары, складские остатки и резервации;
-- получение authoritative product snapshots через HTTP Interface;
-- Transactional Outbox и Kafka publishing;
-- асинхронная обработка `OrderCreatedEvent`;
-- Inbox Pattern и идемпотентность по `eventId`;
-- atomic processing: inbox, reservation, stock changes и result outbox;
-- retry, non-retryable event errors и Dead Letter Topic;
-- Flyway migrations, автоматические тесты и GitHub Actions CI;
-- Docker Compose, multi-stage Dockerfile для обоих сервисов, non-root runtime и Actuator health checks.
-
-### Следующие этапы
-
-- обработка inventory result events в `order-service`;
-- автоматическое изменение статуса заказа после результата резервирования;
-- `payment-service` и compensating action для освобождения резервации;
-- `notification-service`;
-- API Gateway, JWT Security и observability.
-
-> Текущая архитектура является основой choreography-based Saga. Полный Saga workflow будет завершён после добавления оплаты и compensating actions.
+Дальнейшее развитие: авторизация, реальный платёжный провайдер, сквозной сценарий в CI
+и наблюдаемость. Отдельный сервис уведомлений не требуется для завершения текущего флоу.
