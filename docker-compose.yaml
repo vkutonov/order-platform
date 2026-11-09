@@ -129,6 +129,7 @@ services:
       POSTGRES_PASSWORD: ${INVENTORY_DB_PASSWORD}
     ports:
       - "127.0.0.1:${INVENTORY_DB_PORT}:5432"
+      - "127.0.0.1:${INVENTORY_GRPC_HOST_PORT:-9090}:9090"
     volumes:
       - inventory-postgres-data:/var/lib/postgresql
     healthcheck:
