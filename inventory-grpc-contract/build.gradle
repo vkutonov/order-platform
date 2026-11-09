@@ -1,0 +1,52 @@
+plugins {
+    id 'java-library'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.google.protobuf' version '0.9.6'
+}
+
+group = 'com.valentin'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencyManagement {
+    imports {
+        mavenBom 'org.springframework.boot:spring-boot-dependencies:4.1.0'
+    }
+}
+
+dependencies {
+    api 'com.google.protobuf:protobuf-java'
+    api 'io.grpc:grpc-protobuf'
+    api 'io.grpc:grpc-stub'
+}
+
+def managedVersions = dependencyManagement.importedProperties
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:${managedVersions['protobuf-java.version']}"
+    }
+
+    plugins {
+        grpc {
+            artifact = "io.grpc:protoc-gen-grpc-java:${managedVersions['grpc-java.version']}"
+        }
+    }
+
+    generateProtoTasks {
+        all().configureEach { task ->
+            task.plugins {
+                grpc {}
+            }
+        }
+    }
+}
