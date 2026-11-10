@@ -7,9 +7,15 @@ import com.valentin.orderservice.db.OrderHistoryRepository;
 import com.valentin.orderservice.domain.dictionary.ProductStatus;
 import com.valentin.orderservice.dto.ProductSnapshot;
 import com.valentin.orderservice.dto.ProductsBatchRequest;
+import com.valentin.orderservice.exception.ApiErrorCode;
+import com.valentin.orderservice.exception.InventoryClientException;
+import com.valentin.orderservice.exception.ProductNotFoundException;
 import com.valentin.orderservice.messaging.outbox.OutboxEventPoller;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -25,7 +31,9 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -159,6 +167,35 @@ class OrderControllerIntegrationTest {
 
         assertThat(orderRepository.count()).isZero();
         assertThat(orderHistoryRepository.count()).isZero();
+    }
+
+    @ParameterizedTest
+    @MethodSource("inventoryFailures")
+    void createOrder_whenSnapshotsFail_doesNotPersistOrder(RuntimeException failure, int httpStatus) throws Exception {
+        when(inventoryClient.getProductsSnapshot(any(ProductsBatchRequest.class))).thenThrow(failure);
+
+        mockMvc.perform(post("/api/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCreateOrderJson()))
+                .andExpect(status().is(httpStatus));
+
+        assertThat(orderRepository.count()).isZero();
+        assertThat(orderHistoryRepository.count()).isZero();
+    }
+
+    private static Stream<Arguments> inventoryFailures() {
+        return Stream.of(
+                Arguments.of(new ProductNotFoundException(Set.of(FIRST_PRODUCT_ID)), 404),
+                Arguments.of(new InventoryClientException(
+                        ApiErrorCode.INVENTORY_UNAVAILABLE, "Inventory is unavailable", null
+                ), 503),
+                Arguments.of(new InventoryClientException(
+                        ApiErrorCode.INVENTORY_TIMEOUT, "Inventory request timed out", null
+                ), 504),
+                Arguments.of(new InventoryClientException(
+                        ApiErrorCode.INVENTORY_ERROR, "Inventory request failed", null
+                ), 502)
+        );
     }
 
     @Test

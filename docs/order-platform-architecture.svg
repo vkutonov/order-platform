@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1400" height="870" viewBox="0 0 1400 870" role="img" aria-labelledby="title desc">
   <title id="title">Order Platform: сервисы заказов, склада и оплаты</title>
-  <desc id="desc">Клиент вызывает REST API трёх сервисов: заказов, склада и оплаты. Order получает снимки товаров по HTTP из Inventory. Каждый сервис владеет отдельной PostgreSQL с inbox и outbox. События резервирования, оплаты и компенсаций передаются через Kafka с ключом orderId.</desc>
+  <desc id="desc">Клиент вызывает REST API трёх сервисов: заказов, склада и оплаты. Order получает снимки товаров по gRPC из Inventory. Каждый сервис владеет отдельной PostgreSQL с inbox и outbox. События резервирования, оплаты и компенсаций передаются через Kafka с ключом orderId.</desc>
   <defs>
     <marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#94a3b8"/></marker>
     <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#2563eb"/></marker>
@@ -94,7 +94,7 @@
   <text class="small" x="1184" y="623">outbox</text>
 
   <path class="sql" d="M400 310H530"/>
-  <text class="small" x="465" y="294" text-anchor="middle" style="font-weight:600">HTTP</text>
+  <text class="small" x="465" y="294" text-anchor="middle" style="font-weight:600">gRPC</text>
   <text class="muted" x="465" y="336" text-anchor="middle">снимки</text>
 
   <rect x="60" y="670" width="1280" height="130" rx="20" fill="#e8edf7" stroke="#c7d2e5" stroke-width="1.5"/>

@@ -2,12 +2,15 @@ package com.valentin.inventoryservice.grpc;
 
 import com.valentin.inventory.grpc.GetProductSnapshotsRequest;
 import com.valentin.inventory.grpc.GetProductSnapshotsResponse;
+import com.valentin.inventory.grpc.InventoryGrpcMetadata;
 import com.valentin.inventory.grpc.InventoryQueryServiceGrpc;
+import com.valentin.inventory.grpc.MissingProducts;
 import com.valentin.inventory.grpc.ProductSnapshotMessage;
 import com.valentin.inventory.grpc.ProductState;
 import com.valentin.inventoryservice.dto.ProductSnapshotResponse;
 import com.valentin.inventoryservice.exception.ProductNotFoundException;
 import com.valentin.inventoryservice.logic.ProductService;
+import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import lombok.RequiredArgsConstructor;
@@ -69,10 +72,20 @@ public class InventoryGrpcService
             responseObserver.onNext(response);
             responseObserver.onCompleted();
         } catch (ProductNotFoundException exception) {
+            Metadata trailers = new Metadata();
+            trailers.put(
+                    InventoryGrpcMetadata.MISSING_PRODUCTS,
+                    MissingProducts.newBuilder()
+                            .addAllProductIds(exception.getProductIds().stream()
+                                    .map(UUID::toString)
+                                    .sorted()
+                                    .toList())
+                            .build()
+            );
             responseObserver.onError(
                     Status.NOT_FOUND
-                            .withDescription(exception.getMessage())
-                            .asRuntimeException()
+                            .withDescription("Products not found")
+                            .asRuntimeException(trailers)
             );
         } catch (Exception exception) {
             log.error("Failed to get product snapshots", exception);

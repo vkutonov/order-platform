@@ -18,6 +18,10 @@ message GetProductSnapshotsResponse {
   repeated ProductSnapshotMessage products = 1;
 }
 
+message MissingProducts {
+  repeated string product_ids = 1;
+}
+
 message ProductSnapshotMessage {
   string product_id = 1;
   string product_name = 2;

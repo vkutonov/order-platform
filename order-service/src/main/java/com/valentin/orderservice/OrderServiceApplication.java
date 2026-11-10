@@ -1,16 +1,16 @@
 package com.valentin.orderservice;
 
-import com.valentin.orderservice.client.InventoryClient;
+import com.valentin.inventory.grpc.InventoryQueryServiceGrpc;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.grpc.client.ImportGrpcClients;
 import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.web.service.registry.ImportHttpServices;
 
 @EnableScheduling
 @SpringBootApplication
-@ImportHttpServices(
-        group = "inventory",
-        types = InventoryClient.class
+@ImportGrpcClients(
+        target = "inventory",
+        types = InventoryQueryServiceGrpc.InventoryQueryServiceBlockingStub.class
 )
 public class OrderServiceApplication {
 

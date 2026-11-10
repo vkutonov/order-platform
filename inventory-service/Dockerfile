@@ -14,7 +14,7 @@ COPY order-service/build.gradle order-service/
 COPY inventory-service/build.gradle inventory-service/
 COPY payment-service/build.gradle payment-service/
 
-COPY inventory-grpc-contract/src/main/proto inventory-grpc-contract/src/main/proto
+COPY inventory-grpc-contract/src/main inventory-grpc-contract/src/main
 COPY inventory-service/src/main inventory-service/src/main
 
 # BuildKit cache mount для использования кэша между builds
