@@ -6,10 +6,14 @@ WORKDIR /workspace
 
 COPY --chmod=755 gradlew ./gradlew
 COPY gradle gradle
+
 COPY settings.gradle build.gradle ./
+
+COPY inventory-grpc-contract/build.gradle inventory-grpc-contract/
 COPY order-service/build.gradle order-service/
 COPY inventory-service/build.gradle inventory-service/
 COPY payment-service/build.gradle payment-service/
+
 COPY payment-service/src/main payment-service/src/main
 
 RUN --mount=type=cache,id=payment-service-gradle,target=/root/.gradle,sharing=locked \

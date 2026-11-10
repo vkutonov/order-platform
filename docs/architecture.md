@@ -8,7 +8,15 @@
 
 Каждый сервис владеет своей PostgreSQL и выполняет локальные транзакции.
 `order-service` хранит снимки позиций заказа, а актуальные товары и остатки принадлежат
-`inventory-service`. При создании заказа снимки получаются по HTTP.
+`inventory-service`. При создании заказа снимки получаются синхронно по gRPC
+(`InventoryQueryService.GetProductSnapshots` из `inventory-grpc-contract`). Снимок содержит
+название, цену, валюту и статус товара; резервирование остатков выполняется через Kafka.
+
+Deadline запроса snapshots — 3 секунды. `NOT_FOUND` передаёт точные отсутствующие UUID
+в protobuf-сообщении `MissingProducts` через бинарный trailer `missing-products-bin`.
+Order преобразует его в REST `404 / PRODUCT_NOT_FOUND` с `missingProductIds`.
+`UNAVAILABLE` возвращается как HTTP 503, `DEADLINE_EXCEEDED` — 504,
+остальные ошибки зависимости — 502. При ошибке получения snapshots заказ не сохраняется.
 
 Для последующих шагов используются события Kafka. Состояния разных сервисов
 согласуются постепенно: например, `PAID` уже может быть сохранён, пока склад
@@ -55,7 +63,7 @@
 `totalPrice`, `currency` и `context`; сумма и валюта берутся из сохранённого заказа.
 
 `OrderPaidEvent` и `OrderCancelledEvent` имеют одинаковую структуру и представлены
-локальным record `OrderLifecycleEvent` в каждом сервисе. Общей Java-библиотеки контрактов нет.
+локальным record `OrderLifecycleEvent` в каждом сервисе. Общей Java-библиотеки Kafka-контрактов нет.
 Тип сообщения определяется полем `eventType`; `OrderLifecycleEvent` не является отдельным типом события Kafka.
 
 ## Платёж и компенсации

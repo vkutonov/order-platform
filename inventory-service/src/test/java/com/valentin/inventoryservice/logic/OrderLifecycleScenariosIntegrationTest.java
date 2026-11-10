@@ -52,7 +52,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
+@SpringBootTest(properties = "spring.grpc.server.port=0")
 @AutoConfigureMockMvc
 @EmbeddedKafka(partitions = 1, topics = {"order.events", "inventory.events", "order.events.inventory-service.dlt"},
         bootstrapServersProperty = "spring.kafka.bootstrap-servers")

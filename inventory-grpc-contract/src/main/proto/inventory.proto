@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package orderplatform.inventory.v1;
+
+option java_package = "com.valentin.inventory.grpc";
+option java_multiple_files = true;
+
+service InventoryQueryService {
+  rpc GetProductSnapshots(GetProductSnapshotsRequest)
+      returns (GetProductSnapshotsResponse);
+}
+
+message GetProductSnapshotsRequest {
+  repeated string product_ids = 1;
+}
+
+message GetProductSnapshotsResponse {
+  repeated ProductSnapshotMessage products = 1;
+}
+
+message MissingProducts {
+  repeated string product_ids = 1;
+}
+
+message ProductSnapshotMessage {
+  string product_id = 1;
+  string product_name = 2;
+  string unit_price = 3;
+  string currency = 4;
+  ProductState status = 5;
+}
+
+enum ProductState {
+  PRODUCT_STATE_UNSPECIFIED = 0;
+  PRODUCT_STATE_ACTIVE = 1;
+  PRODUCT_STATE_INACTIVE = 2;
+  PRODUCT_STATE_DELETED = 3;
+}

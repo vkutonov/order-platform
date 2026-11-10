@@ -2,13 +2,13 @@ server:
   port: ${ORDER_SERVICE_PORT:8081}
 
 spring:
-  http:
-    serviceclient:
-      inventory:
-        base-url: ${INVENTORY_SERVICE_URL:http://localhost:8082}
-        connect-timeout: 2s
-        read-timeout: 3s
-
+  grpc:
+    client:
+      channel:
+        inventory:
+          target: ${INVENTORY_GRPC_TARGET:static://localhost:9090}
+          ssl:
+            enabled: false
 
   config:
     import:

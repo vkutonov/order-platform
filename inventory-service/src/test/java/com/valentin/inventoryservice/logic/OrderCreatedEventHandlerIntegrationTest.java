@@ -35,7 +35,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest(properties = {"server.port=0", "spring.kafka.listener.auto-startup=false"})
+@SpringBootTest(properties = {"server.port=0", "spring.grpc.server.port=0", "spring.kafka.listener.auto-startup=false"})
 @Testcontainers
 class OrderCreatedEventHandlerIntegrationTest {
 

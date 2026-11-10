@@ -26,7 +26,8 @@ Java 21 · Spring Boot 4.1 · PostgreSQL · Apache Kafka · Docker Compose
 ![Три сервиса, отдельные PostgreSQL и обмен событиями через Kafka](docs/order-platform-architecture.svg)
 
 При создании заказа `order-service` получает снимки товаров из `inventory-service`
-по HTTP. Резервирование, обработка оплаты и компенсации затем выполняются через Kafka.
+по gRPC (`InventoryQueryService.GetProductSnapshots`, контракт — `inventory-grpc-contract`).
+Резервирование, обработка оплаты и компенсации затем выполняются через Kafka.
 `PAID` означает получение оплаты; списание резерва применяется асинхронно.
 
 | Сервис | Ответственность | Swagger |

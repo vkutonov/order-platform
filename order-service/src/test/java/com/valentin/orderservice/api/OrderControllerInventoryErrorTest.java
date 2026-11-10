@@ -1,37 +1,46 @@
 package com.valentin.orderservice.api;
 
-import com.valentin.orderservice.client.InventoryClient;
+import com.valentin.inventory.grpc.GetProductSnapshotsRequest;
+import com.valentin.inventory.grpc.GetProductSnapshotsResponse;
+import com.valentin.inventory.grpc.InventoryGrpcMetadata;
+import com.valentin.inventory.grpc.InventoryQueryServiceGrpc;
+import com.valentin.inventory.grpc.MissingProducts;
+import com.valentin.orderservice.client.GrpcInventoryClient;
 import com.valentin.orderservice.exception.GlobalExceptionHandler;
 import com.valentin.orderservice.logic.OrderCommandService;
 import com.valentin.orderservice.logic.OrderCreationValidator;
 import com.valentin.orderservice.logic.OrderQueryService;
 import com.valentin.orderservice.logic.OrderService;
+import io.grpc.ManagedChannel;
+import io.grpc.Metadata;
+import io.grpc.Server;
+import io.grpc.Status;
+import io.grpc.inprocess.InProcessChannelBuilder;
+import io.grpc.inprocess.InProcessServerBuilder;
+import io.grpc.stub.StreamObserver;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.support.RestClientAdapter;
-import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.stream.Stream;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -48,18 +57,29 @@ class OrderControllerInventoryErrorTest {
             }
             """.formatted(PRODUCT_ID);
 
-    private MockRestServiceServer inventoryServer;
+    private Server server;
+    private ManagedChannel channel;
+    private Consumer<StreamObserver<GetProductSnapshotsResponse>> inventoryResponse;
+    private GetProductSnapshotsRequest inventoryRequest;
     private MockMvc mockMvc;
     private OrderCommandService commandService;
 
     @BeforeEach
-    void setUp() {
-        RestClient.Builder builder = RestClient.builder().baseUrl("http://inventory-service");
-        inventoryServer = MockRestServiceServer.bindTo(builder).build();
-        InventoryClient inventoryClient = HttpServiceProxyFactory
-                .builderFor(RestClientAdapter.create(builder.build()))
-                .build()
-                .createClient(InventoryClient.class);
+    void setUp() throws Exception {
+        String serverName = InProcessServerBuilder.generateName();
+        server = InProcessServerBuilder.forName(serverName).directExecutor()
+                .addService(new InventoryQueryServiceGrpc.InventoryQueryServiceImplBase() {
+                    @Override
+                    public void getProductSnapshots(
+                            GetProductSnapshotsRequest request,
+                            StreamObserver<GetProductSnapshotsResponse> observer
+                    ) {
+                        inventoryRequest = request;
+                        inventoryResponse.accept(observer);
+                    }
+                }).build().start();
+        channel = InProcessChannelBuilder.forName(serverName).directExecutor().build();
+        var inventoryClient = new GrpcInventoryClient(InventoryQueryServiceGrpc.newBlockingStub(channel));
 
         commandService = mock(OrderCommandService.class);
         OrderService orderService = new OrderService(
@@ -75,17 +95,19 @@ class OrderControllerInventoryErrorTest {
         ).setControllerAdvice(handler).build();
     }
 
+    @AfterEach
+    void tearDown() throws InterruptedException {
+        channel.shutdownNow().awaitTermination(5, TimeUnit.SECONDS);
+        server.shutdownNow().awaitTermination(5, TimeUnit.SECONDS);
+    }
+
     @Test
     void createOrder_whenInventoryProductNotFound_returnsOnlyMissingIds() throws Exception {
-        respondFromInventory(HttpStatus.NOT_FOUND, """
-                {
-                  "status": 404,
-                  "code": "PRODUCT_NOT_FOUND",
-                  "message": "Некоторые товары не найдены",
-                  "missingProductIds": ["%s"],
-                  "path": "/internal/products/batch"
-                }
-                """.formatted(PRODUCT_ID));
+        Metadata trailers = new Metadata();
+        trailers.put(InventoryGrpcMetadata.MISSING_PRODUCTS,
+                MissingProducts.newBuilder().addProductIds(PRODUCT_ID).build());
+        inventoryResponse = observer -> observer.onError(Status.NOT_FOUND
+                .withDescription("Internal inventory details").asRuntimeException(trailers));
 
         mockMvc.perform(post("/api/orders")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -93,36 +115,31 @@ class OrderControllerInventoryErrorTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.code").value("PRODUCT_NOT_FOUND"))
-                .andExpect(jsonPath("$.message")
-                        .value("Order creation failed, products missed"))
+                .andExpect(jsonPath("$.message").value("Order creation failed, products missed"))
                 .andExpect(jsonPath("$.missingProductIds.length()").value(1))
                 .andExpect(jsonPath("$.missingProductIds[0]").value(PRODUCT_ID))
                 .andExpect(jsonPath("$.path").value("/api/orders"))
+                .andExpect(jsonPath("$.timestamp").value("2026-10-08T04:08:33Z"))
                 .andExpect(jsonPath("$.error").doesNotExist())
                 .andExpect(jsonPath("$.fieldErrors").doesNotExist());
 
-        inventoryServer.verify();
+        assertThat(inventoryRequest.getProductIdsList()).hasSize(2).contains(PRODUCT_ID);
         verifyNoInteractions(commandService);
     }
 
     @Test
-    void createOrder_whenOldInventoryResponseHasNoIds_returnsClean404() throws Exception {
-        respondFromInventory(HttpStatus.NOT_FOUND, """
-                {"status":404,"error":"Not Found","code":"PRODUCT_NOT_FOUND",
-                 "message":"Products not found: productIds=[%s]"}
-                """.formatted(PRODUCT_ID));
+    void createOrder_whenNotFoundHasNoTrailers_doesNotGuessMissingIds() throws Exception {
+        inventoryResponse = observer -> observer.onError(Status.NOT_FOUND
+                .withDescription("Products not found: productIds=[" + PRODUCT_ID + "]")
+                .asRuntimeException());
 
         mockMvc.perform(post("/api/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(ORDER_REQUEST))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("PRODUCT_NOT_FOUND"))
-                .andExpect(jsonPath("$.message")
-                        .value("Order creation failed, products missed"))
-                .andExpect(jsonPath("$.error").doesNotExist())
                 .andExpect(jsonPath("$.missingProductIds").doesNotExist());
 
-        inventoryServer.verify();
         verifyNoInteractions(commandService);
     }
 
@@ -133,53 +150,49 @@ class OrderControllerInventoryErrorTest {
                         .content("{\"userId\":null,\"items\":[]}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.fieldErrors.length()").value(2))
-                .andExpect(jsonPath("$.error").doesNotExist())
-                .andExpect(jsonPath("$.missingProductIds").doesNotExist());
+                .andExpect(jsonPath("$.fieldErrors.length()").value(2));
 
-        inventoryServer.verify();
+        assertThat(inventoryRequest).isNull();
         verifyNoInteractions(commandService);
     }
 
     @ParameterizedTest
-    @MethodSource("unmappedInventoryErrors")
-    void createOrder_whenInventoryFailureIsNotProductNotFound_returns500(
-            HttpStatus upstreamStatus,
-            String payload
+    @CsvSource({
+            "UNAVAILABLE, 503, INVENTORY_UNAVAILABLE, Inventory is unavailable",
+            "DEADLINE_EXCEEDED, 504, INVENTORY_TIMEOUT, Inventory request timed out"
+    })
+    void createOrder_whenInventoryIsUnavailableOrTimesOut_returnsGatewayError(
+            Status.Code grpcCode, int httpStatus, String code, String message
     ) throws Exception {
-        respondFromInventory(upstreamStatus, payload);
+        assertInventoryFailure(grpcCode, httpStatus, code, message);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = Status.Code.class, mode = EnumSource.Mode.EXCLUDE,
+            names = {"OK", "NOT_FOUND", "UNAVAILABLE", "DEADLINE_EXCEEDED"})
+    void createOrder_whenInventoryFails_returnsBadGateway(Status.Code grpcCode) throws Exception {
+        assertInventoryFailure(grpcCode, 502, "INVENTORY_ERROR", "Inventory request failed");
+    }
+
+    private void assertInventoryFailure(
+            Status.Code grpcCode, int httpStatus, String code, String message
+    ) throws Exception {
+        inventoryResponse = observer -> observer.onError(Status.fromCode(grpcCode)
+                .withDescription("Internal inventory details").asRuntimeException());
 
         mockMvc.perform(post("/api/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(ORDER_REQUEST))
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.status").value(500))
-                .andExpect(jsonPath("$.code").value("INTERNAL_SERVER_ERROR"))
-                .andExpect(jsonPath("$.message").value("Internal server error"))
-                .andExpect(jsonPath("$.error").doesNotExist());
+                .andExpect(status().is(httpStatus))
+                .andExpect(jsonPath("$.status").value(httpStatus))
+                .andExpect(jsonPath("$.code").value(code))
+                .andExpect(jsonPath("$.message").value(message))
+                .andExpect(jsonPath("$.path").value("/api/orders"))
+                .andExpect(jsonPath("$.timestamp").value("2026-10-08T04:08:33Z"))
+                .andExpect(jsonPath("$.missingProductIds").doesNotExist())
+                .andExpect(jsonPath("$.stackTrace").doesNotExist())
+                .andExpect(content().string(not(containsString("Internal inventory details"))));
 
-        inventoryServer.verify();
         verifyNoInteractions(commandService);
-    }
-
-    private static Stream<Arguments> unmappedInventoryErrors() {
-        return Stream.of(
-                Arguments.of(HttpStatus.NOT_FOUND, "{\"code\":\"RESOURCE_NOT_FOUND\"}"),
-                Arguments.of(HttpStatus.NOT_FOUND, "{\"status\":404}"),
-                Arguments.of(HttpStatus.NOT_FOUND, "not-json"),
-                Arguments.of(HttpStatus.NOT_FOUND, "null"),
-                Arguments.of(HttpStatus.NOT_FOUND, """
-                        {"code":"PRODUCT_NOT_FOUND","missingProductIds":["invalid-uuid"]}
-                        """),
-                Arguments.of(HttpStatus.INTERNAL_SERVER_ERROR, "{\"code\":\"PRODUCT_NOT_FOUND\"}")
-        );
-    }
-
-    private void respondFromInventory(HttpStatus upstreamStatus, String payload) {
-        inventoryServer.expect(requestTo("http://inventory-service/internal/products/batch"))
-                .andExpect(method(HttpMethod.POST))
-                .andRespond(withStatus(upstreamStatus)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .body(payload));
     }
 }

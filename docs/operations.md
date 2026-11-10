@@ -13,6 +13,7 @@ Compose читает `.env` из корня проекта. Шаблон — [`.
 | Компонент | Порт на хосте из шаблона |
 |---|---|
 | Order / Inventory / Payment | `8081` / `8082` / `8083` |
+| Inventory gRPC | `9090` (`INVENTORY_GRPC_HOST_PORT`) |
 | PostgreSQL Order / Inventory / Payment | `5433` / `5434` / `5435` |
 | Kafka для приложений на хосте | `9092` |
 | Kafka UI | `8085` |
@@ -20,6 +21,12 @@ Compose читает `.env` из корня проекта. Шаблон — [`.
 В Docker сервисы обращаются к Kafka по `kafka:19092`, к своим БД — по имени сервиса
 на порту `5432`. Из IDE используются внешние порты из таблицы.
 Профили для ручного подтверждения оплаты подключать не нужно.
+
+Snapshots передаются через gRPC, бизнес-события — через Kafka. Из IDE order использует
+`INVENTORY_GRPC_TARGET=static://localhost:9090` по умолчанию; в Compose адрес задан как
+`static://inventory-service:9090`. Если внешний порт изменён через `INVENTORY_GRPC_HOST_PORT`,
+укажите его в `INVENTORY_GRPC_TARGET` для order, запущенного из IDE.
+`INVENTORY_GRPC_PORT` меняет порт сервера при запуске inventory из IDE (по умолчанию `9090`).
 
 Полезные команды из корня:
 
@@ -89,12 +96,10 @@ docker compose up -d order-postgres inventory-postgres payment-postgres kafka ka
 | Inventory | `DELETE /api/products/{id}` | Мягко удалить товар |
 | Inventory | `GET /api/products/{id}/stock` | Получить общий, зарезервированный и доступный остаток |
 | Inventory | `POST /api/products/{id}/stock` | Пополнить остаток |
-| Inventory | `POST /internal/products/batch` | Получить снимки товаров для order-service |
 | Payment, `8083` | `GET /api/payments` | Получить платежи, сначала новые |
 | Payment | `POST /api/payments/by-order/{orderId}/confirm` | Подтвердить платёж заказа |
 | Payment | `POST /api/payments/by-order/{orderId}/reject` | Отклонить платёж заказа |
 
-`/internal/**` предназначен для межсервисного использования; авторизацией эти ручки пока не закрыты.
 
 ### Удаление товара
 
@@ -122,6 +127,12 @@ docker compose up -d order-postgres inventory-postgres payment-postgres kafka ka
 При валидации добавляется `fieldErrors` с парами `field` / `message`;
 для отсутствующих товаров Order и Inventory могут вернуть `missingProductIds`.
 Пустые дополнительные списки опускаются.
+
+При получении snapshots Order возвращает `404 / PRODUCT_NOT_FOUND` с точными
+`missingProductIds`, `503 / INVENTORY_UNAVAILABLE` при недоступности inventory,
+`504 / INVENTORY_TIMEOUT` при истечении deadline (3 секунды) и
+`502 / INVENTORY_ERROR` при других ошибках зависимости. Внутренние сообщения gRPC
+не передаются в REST-ответ. Заказ при этих ошибках не сохраняется.
 
 Пример ответа payment-service:
 

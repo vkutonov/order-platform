@@ -65,9 +65,10 @@ jobs:
         run: java -version
 
       - name: Build and run tests
+        working-directory: .
         run: |
           chmod +x ./gradlew
-          ./gradlew build --no-daemon --stacktrace
+          ./gradlew :${{matrix.service}}:build --no-daemon --stacktrace
 
       - name: Upload test reports on failure
         if: ${{ failure() && env.ACT != 'true' }}

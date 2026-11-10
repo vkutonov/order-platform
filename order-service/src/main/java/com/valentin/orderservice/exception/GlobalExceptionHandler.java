@@ -11,8 +11,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.RestClientException;
 
 import java.time.Clock;
 import java.util.List;
@@ -149,41 +147,6 @@ public class GlobalExceptionHandler {
     }
 
 
-    @ExceptionHandler(HttpClientErrorException.NotFound.class)
-    public ResponseEntity<?> handleInventoryNotFound(
-            HttpClientErrorException.NotFound exception,
-            HttpServletRequest request
-    ) {
-        ClientErrorResponse inventoryError;
-        try {
-            inventoryError = exception.getResponseBodyAs(ClientErrorResponse.class);
-        } catch (RestClientException invalidResponse) {
-            return handleUnexpectedException(exception, request);
-        }
-
-        if (inventoryError == null
-                || !ApiErrorCode.PRODUCT_NOT_FOUND.name().equals(inventoryError.code())) {
-            return handleUnexpectedException(exception, request);
-        }
-
-        List<UUID> missingProductIds = inventoryError.missingProductIds() != null
-                ? inventoryError.missingProductIds()
-                : List.of();
-
-        log.warn(
-                "Product not found: path={}, missingProductIds={}",
-                request.getRequestURI(),
-                missingProductIds
-        );
-
-        return clientErrorResponse(
-                ApiErrorCode.PRODUCT_NOT_FOUND,
-                MISSING_PRODUCTS_MESSAGE,
-                request,
-                List.of(),
-                missingProductIds
-        );
-    }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ServerErrorResponse> handleUnexpectedException(
             Exception exception,
