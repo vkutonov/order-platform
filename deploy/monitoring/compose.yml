@@ -1,0 +1,31 @@
+services:
+  prometheus:
+    image: prom/prometheus:v3.16.0
+    ports: 
+      - "127.0.0.1:${PROMETHEUS_PORT:-9091}:9090"
+    extra_hosts:
+      - "vm-host:${MONITORING_HOST_IP:-172.17.0.1}"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+
+  grafana:
+    image: grafana/grafana-enterprise:13.3.1
+    ports: 
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+  
+  node-exporter:
+    image: quay.io/prometheus/node-exporter:v1.12.1
+    network_mode: host
+    pid: host
+    command:
+      - "--path.rootfs=/host"
+      - "--web.listen-address=${MONITORING_HOST_IP:-172.17.0.1}:9100"
+    volumes:
+      - "/:/host:ro,rslave"
+
+volumes:
+  prometheus-data:
+  grafana-data:
